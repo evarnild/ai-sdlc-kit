@@ -5,6 +5,9 @@ already set up with an AI-native SDLC. Every change goes from an intent,
 through spec and plan, to an agentic review and a human-approved merge. The
 gates are recorded in files and enforced by a script.
 
+**Read the [user guide](GUIDE.md)** for the whole process: roles, gates,
+review tiers, mutation testing, live checks, merging, and a worked example.
+
 The kit was first built for and battle-tested on
 [heraklios](https://github.com/evarnild/heraklios), then made
 stack-agnostic.
