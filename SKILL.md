@@ -1,12 +1,12 @@
 ---
 name: new-sdlc-project
-description: Create a new project with the core AI-native SDLC kit (intents/ with types and gates, REVIEW-POLICY.md, sdlc.md, the /intent /review /grid skills, implementer and reviewer agents for Claude and Codex, check:intent, sdlc:scan), git-initialised, verified and committed in one step. Use when the user wants to start a new project or repo "with the AI SDLC", "with intents and review gates", or "with the SDLC kit".
+description: Create a new project with the AI-native SDLC kit (intents/ with types and gates, REVIEW-POLICY.md, sdlc.md, the /intent /spec /build-plan /review /ship /spawn /sessions /auto /grid skills, implementer and reviewer agents for Claude and Codex, check:intent, a generated queue, sdlc:scan), git-initialised, verified and committed in one step. Use when the user wants to start a new project or repo "with the AI SDLC", "with intents and review gates", or "with the SDLC kit".
 metadata:
-  version: 0.2.0
+  version: 0.3.0
   source: https://github.com/evarnild/ai-sdlc-kit
 ---
 
-# Create a project with the core AI-native SDLC
+# Create a project with the AI-native SDLC
 
 Everything is in this skill's folder (normally
 `~/.claude/skills/new-sdlc-project/`):
@@ -33,7 +33,7 @@ Everything is in this skill's folder (normally
   says so.
 
 Don't ask about anything else. The conventions are fixed: local merges,
-committed `review.md`, core kit only. If the user gave everything in the
+committed `review.md`, a generated queue (no root `plan.md`). If the user gave everything in the
 request, ask nothing.
 
 ## 2. Run it
@@ -64,7 +64,9 @@ Tell the user:
 
 ## Keeping the template current
 
-The template is a frozen copy. Port an improvement to the kit into
+The template is a frozen copy, last brought up to date with heraklios
+`main` on 2026-11-03 (its orchestrator UI and e2e helpers stay out: they
+need the Agent SDK or a browser stack). Port an improvement to the kit into
 `template/` deliberately:
 - keep the placeholders;
 - run `node scaffold.mjs tmp-check --parent <a temp dir>` to prove the

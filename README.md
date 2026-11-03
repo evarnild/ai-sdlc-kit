@@ -19,15 +19,22 @@ stack-agnostic.
 | `intents/` + templates | one folder per piece of work: `intent.md`, `spec.md`, `plan.md`, `review.md`, `metadata.yml` |
 | five types | feature, fix, refactor, adjustment, experiment; each type decides which artefacts and gates apply |
 | gates | `intent_accepted`, `spec_accepted`, `plan_approved`, `live_checked`, recorded as dates by the human |
+| gate recording | you record a gate, or an agent does on your explicit request in the current conversation, marked `by-agent`; a subagent never does |
 | `npm run check:intent` | fails a branch whose code arrived before its gates; routes a change whose shape doesn't fit its declared type |
+| `npm run queue` | the intent queue, generated from every `metadata.yml` (on `main` and on unmerged branches); nobody edits it |
 | `REVIEW-POLICY.md` | three review tiers (Automated, Attested, Reviewed), nine review passes including mutation testing, live checks, merge preconditions |
-| `/intent`, `/review`, `/grid` | Claude Code skills that draft intents, run the review policy, and score the project on an L0–L4 grid |
+| `/intent`, `/spec`, `/build-plan` | draft the intent, the spec and the plan, each stamped by a versioned skill |
+| `/review` | runs the review policy and writes `review.md`; findings say "Needs rework:" or "Needs decision:" |
+| `/ship` (`npm run ship`) | merges a reviewed intent: preconditions, `--no-ff`, verify, bookkeeping, push, worktree and branch removal; stops at the first failing step |
+| `/spawn`, `/sessions` | one worktree and Claude Code session per intent, and a coordinator view of what every session is doing (fed by hooks) |
+| `/auto` | carries an accepted intent from spec to "ready: `/ship`" without prompts between steps, stopping only for your decisions |
+| `/grid` | scores the project on an L0–L4 grid |
 | implementer and reviewer agents | for Claude Code (`.claude/agents/`) and Codex (`.codex/agents/`) |
-| `npm run sdlc:scan` | the evidence behind the grid: intents, stamps, verdicts, throughput beside revert rate |
+| `npm run sdlc:scan` | the evidence behind the grid: intents, stamps, verdicts, throughput beside revert rate, quality per tier and run kind, sampling |
 | `sdlc.md` | the step-by-step version for the human |
 
 The kit itself needs only **Node 22 or later** and **git**: no `npm install`,
-and its 58 tests run on `node:test`. The product's stack is the first
+and its tests run on `node:test`. The product's stack is the first
 intent's decision (§1), so the kit works for Python, TypeScript, Go or
 anything else.
 

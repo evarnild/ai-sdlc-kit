@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Creates a new project with the core AI-native SDLC kit.
+// Creates a new project with the AI-native SDLC kit.
 //
 //   node scaffold.mjs <name> [--description "..."] [--stack "..."] [--owner "..."]
 //                     [--parent <dir>] [--no-codex] [--no-commit] [--dry-run]
@@ -128,10 +128,12 @@ if (opts.commit) {
   try {
     git(
       'commit', '-q', '-m',
-      'Scaffold: core AI-native SDLC kit\n\n' +
-        'intents/ with templates and types, REVIEW-POLICY.md, sdlc.md, the /intent,\n' +
-        '/review and /grid skills, implementer and reviewer agents, check:intent and\n' +
-        'sdlc:scan. Stack-agnostic until §1; the kit needs only Node.',
+      'Scaffold: AI-native SDLC kit\n\n' +
+        'intents/ with templates and types, REVIEW-POLICY.md, sdlc.md, OVERVIEW.md,\n' +
+        'the /intent /spec /build-plan /review /ship /spawn /sessions /auto /grid\n' +
+        'skills, implementer and reviewer agents, session hooks, check:intent, queue,\n' +
+        'ship, spawn, sessions and sdlc:scan. Stack-agnostic until §1; the kit needs\n' +
+        'only Node.',
     );
     commit = git('log', '--oneline', '-1');
   } catch {

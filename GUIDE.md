@@ -24,12 +24,14 @@ disagree, the project files win.
 9. [Review: tiers, passes, verdicts](#9-review-tiers-passes-verdicts)
 10. [Live checks](#10-live-checks)
 11. [Merging](#11-merging)
-12. [The grid and the scan](#12-the-grid-and-the-scan)
-13. [Your first intent: §1](#13-your-first-intent-1)
-14. [A worked example](#14-a-worked-example)
-15. [Everyday commands](#15-everyday-commands)
-16. [FAQ and troubleshooting](#16-faq-and-troubleshooting)
-17. [Glossary](#17-glossary)
+12. [Parallel sessions](#12-parallel-sessions)
+13. [Auto mode: `/auto`](#13-auto-mode-auto)
+14. [The grid and the scan](#14-the-grid-and-the-scan)
+15. [Your first intent: §1](#15-your-first-intent-1)
+16. [A worked example](#16-a-worked-example)
+17. [Everyday commands](#17-everyday-commands)
+18. [FAQ and troubleshooting](#18-faq-and-troubleshooting)
+19. [Glossary](#19-glossary)
 
 ---
 
@@ -58,6 +60,10 @@ splits the work along that line:
 - **Claims are checked, not trusted.** `npm run check:intent` verifies that
   the gates were passed before code arrived. The review re-runs everything
   itself and mutation-tests the changed lines.
+- **The steps can run on their own.** `/auto <id>` carries an accepted
+  intent from spec to a merge-ready branch, stopping only for your
+  decisions, and `/spawn` runs several intents at once in their own
+  worktrees.
 - **Progress is measured.** `/grid` scores the project on six stages and
   five levels, and always reads throughput beside the revert rate.
 
@@ -105,7 +111,7 @@ The scaffold:
 - copies the kit;
 - fills in the name, owner, date and path;
 - runs `git init` on `main`;
-- runs `npm run verify` (the kit's 58 tests);
+- runs `npm run verify` (the kit's own tests);
 - makes one commit.
 
 It refuses to overwrite a folder that already exists.
@@ -123,8 +129,9 @@ It refuses to overwrite a folder that already exists.
 ### Then
 
 Open a **new Claude Code session in the project folder**. The project's
-skills (`/intent`, `/review`, `/grid`) and agents only load there. Then
-start §1 (see [section 13](#13-your-first-intent-1)).
+skills (`/intent`, `/spec`, `/build-plan`, `/review`, `/ship`, `/auto`, and
+the rest) and agents only load there. Then
+start §1 (see [section 15](#15-your-first-intent-1)).
 
 ---
 
@@ -134,17 +141,18 @@ start §1 (see [section 13](#13-your-first-intent-1)).
 CLAUDE.md            context for agents: commands, how work flows, architecture
 AGENTS.md            the same for Codex
 sdlc.md              the one-page process for you
-plan.md              coordinator view: snapshot, queue, backlog, shipped
+OVERVIEW.md          a short snapshot you edit; the queue itself is generated
 REVIEW-POLICY.md     tiers, review passes, live checks, merge rules
 intents/
   README.md          types, gates, who edits what
   _templates/        intent.md, spec.md, plan.md, metadata.yml
 docs/sdlc-grid.md    where the project stands on the L0–L4 grid
-scripts/             check-intent, sdlc-scan, and their tests (Node only)
-.claude/skills/      /intent, /review, /grid
+scripts/             check-intent, queue, ship, spawn, sessions, sdlc-scan, and their tests (Node only)
+.claude/skills/      /intent /spec /build-plan /review /ship /spawn /sessions /auto /grid
 .claude/agents/      <name>-implementer, <name>-reviewer
+.claude/settings.json  hooks that log what each session is doing (for /sessions)
 .codex/agents/       the same agents for Codex
-package.json         npm scripts: verify, check:intent, sdlc:scan, test:kit
+package.json         npm scripts: verify, check:intent, queue, ship, spawn, sessions, sdlc:scan, test:kit
 ```
 
 The kit's scripts need no `npm install`. Your product's stack arrives with
@@ -157,8 +165,9 @@ The kit's scripts need no `npm install`. Your product's stack arrives with
 | Role | Who | Does | Never does |
 | --- | --- | --- | --- |
 | **Owner** | you | accepts intents and specs, approves plans, runs live checks, approves merges | — |
-| **Coordinator** | the Claude Code session in the main checkout | edits `plan.md`, runs `/intent`, `/review`, `/grid`; merges when you ask | merges, pushes or records gates on its own initiative |
-| **Implementer** | the `<name>-implementer` agent, in its own branch or worktree | builds an approved plan, tests first; appends to `## Progress`; sets `status: in-review` | edits the plan, records gates, touches `main`, pushes, merges |
+| **Coordinator** | the Claude Code session in the main checkout | runs the skills (`/intent`, `/spec`, `/build-plan`, `/review`, `/spawn`, `/sessions`, `/auto`, `/grid`); records a gate when you ask; ships when you ask | merges, pushes or records gates on its own initiative |
+| **Spawned session** | a Claude Code session in an intent's worktree (`/spawn`) | the implementer for that one intent; may draft its missing spec or plan | merges, works on other intents |
+| **Implementer** | the `<name>-implementer` agent, in its own branch or worktree | builds an approved plan, tests first; appends to `## Progress`; sets `status: in-review` | edits the plan, records gates (a subagent never does), touches `main`, pushes, merges |
 | **Reviewer** | the `<name>-reviewer` agent, called by `/review` | runs the passes, read-only; reports findings | modifies files (only `/review` writes `review.md`) |
 
 Two rules matter more than the rest:
@@ -200,11 +209,14 @@ type: `--feature`, `--fix`, `--refactor`, `--adjust` or `--exp`.
 ```
 
 The skill:
-- reads what already exists (`plan.md`, earlier intents, `docs/`, and the
-  code for a fix);
+- takes the id from `npm run queue -- --next-id`;
+- reads what already exists (`OVERVIEW.md`, the queue, earlier intents,
+  `docs/`, and the code for a fix);
 - asks **at most one round** of questions;
-- creates `intents/<id>-<slug>/intent.md` and `metadata.yml`;
-- adds a row to `plan.md`'s queue.
+- creates `intents/<id>-<slug>/intent.md` and `metadata.yml`.
+
+There is no queue row to add: `npm run queue` is generated from the
+`metadata.yml` files, and lists the intent once it is committed.
 
 Anything it filled in without being told is listed under **Assumptions I
 made**. Read that list.
@@ -229,8 +241,9 @@ What a good intent looks like:
 - the non-functional points (boundaries, data, model use, autonomy);
 - what is out of scope.
 
-Ask Claude to draft it ("draft the spec for §4"), then edit it until it's
-right.
+Run `/spec <id>`. It drafts the spec against current `main`, asks only
+about the intent's open design questions, and stamps the file. Edit it until
+it's right.
 
 **Your gate:** `spec_accepted: <date>`.
 
@@ -244,6 +257,9 @@ right.
 - the test contract;
 - the validation steps.
 
+Run `/build-plan <id>`. It has no question round: a question at plan time
+means the spec (or a fix's intent) is incomplete, so it stops and says so.
+
 **Your gate:** `plan_approved: <date>`. No code before this. `check:intent`
 fails a change whose code came first.
 
@@ -252,9 +268,11 @@ You fix the plan and re-approve it; the build doesn't push through.
 
 ### Step 4: Build
 
-Ask the coordinator to build it: "implement §4". It creates the branch
-`<prefix>/<id>-<slug>` in a worktree and hands the approved plan to the
-implementer agent. The implementer:
+Ask the coordinator to build it: "implement §4", or run `/spawn 4` to build
+it in its own worktree alongside other work (see
+[section 12](#12-parallel-sessions)). Either way the branch is
+`<prefix>/<id>-<slug>`, and the approved plan goes to the implementer
+agent. The implementer:
 
 - writes tests first (for a fix: a test that fails before the fix);
 - commits early and often;
@@ -285,13 +303,14 @@ See [section 9](#9-review-tiers-passes-verdicts).
 
 If the report says `live-check: owed`, its `## Live check` section tells you
 exactly what to run and what you should see. Do it yourself, then record
-`live_checked: <date>`. See [section 10](#10-live-checks).
+`live_checked: <date>`, or tell Claude you ran it and ask it to record the
+date. See [section 10](#10-live-checks).
 
 ### Step 7: Merge
 
-Commit `review.md` (and the `live_checked:` date) to the branch. Then ask:
-"merge §4". Before merging, the coordinator checks three things and refuses
-if any fails:
+Commit `review.md` (and the `live_checked:` date) to the branch. Then run
+`/ship 4` (or `/ship 4 --dry-run` to only ask "can it ship?"). Before
+merging, it checks three things and refuses if any fails:
 - the review covers exactly what is being merged;
 - `check:intent` passes;
 - no live check is outstanding.
@@ -300,7 +319,8 @@ Then it:
 1. merges with `--no-ff`;
 2. runs `verify` on `main`;
 3. sets `merged:` and `status: done`;
-4. moves the row in `plan.md` to Shipped.
+4. pushes, if there is a remote;
+5. removes the intent's worktree and branch.
 
 See [section 11](#11-merging).
 
@@ -353,6 +373,9 @@ spec_accepted:           # feature only
 plan_approved: 2026-10-21
 live_checked:            # only when review.md says live-check: owed
 merged:
+auto_authorized:         # /auto only; not a gate
+auto_round:
+auto_stopped:
 follows_up: 2
 links:
   - intents/2-intake
@@ -368,25 +391,32 @@ links:
 | `live_checked` | I ran it myself and saw what the review said I should |
 | (merge) | I read the report (and the diff at the Reviewed tier) and take responsibility |
 
-A gate counts **only when it holds a date** (`YYYY-MM-DD`). `yes`, `TBD`,
-`~` and `approved` don't count.
+A gate counts **only when it holds a date** (`YYYY-MM-DD`): bare when you
+wrote it, or followed by `by-agent` when an agent wrote it on your request
+(`plan_approved: 2026-10-21 by-agent`). `yes`, `TBD`, `~` and `approved`
+don't count, and `check:intent` FAILs them.
 
 ### Who records a gate
 
 **You do.** It's a one-line edit, and you can commit it with the rest.
 
-You can also let an agent record it for you, under all of these
-conditions:
+You can also let an agent record it for you:
 - you ask, in the current conversation, for **that gate on that intent**.
   "Accept §4's intent" or "approve the plan for §4" both work, and so does
-  "yes" in reply to a message that proposed recording that gate;
-- the agent writes today's date and adds the comment
-  `# recorded by agent on owner's request`;
-- the commit subject says so, for example `§4: plan approved (recorded on
-  the owner's request)`.
+  "yes" in reply to a message that proposed recording that gate (it covers
+  every gate that message named, and nothing more);
+- the agent writes today's date followed by `by-agent`, and the commit
+  subject says so, for example `§4: plan approved (recorded on the owner's
+  request)`;
+- a standing instruction, a memory, a `CLAUDE.local.md` brief or a request
+  made in another session doesn't count. A subagent never records a gate:
+  your request isn't in its conversation;
+- `/auto <id>` is a request for exactly one gate, that intent's
+  `plan_approved` (see [section 13](#13-auto-mode-auto)).
 
-**`live_checked:` is always yours.** Its whole point is a check by someone
-other than the model that wrote and reviewed the code.
+**`live_checked:` stays your decision.** You run the check; an agent records
+the date only after you say you ran it. An agent's own run is never the
+check.
 
 Why so strict? A gate an agent records on autopilot drifts into a
 formality. You end up approving things you haven't read, and later nobody
@@ -494,6 +524,10 @@ backup and ends with a clean `git status`.
 - **MEDIUM**: correct but fragile, or misleading docs.
 - **LOW**: stale docs, or something minor.
 
+Each finding that needs rework says which kind: **"Needs rework:"** when the
+spec, the plan or a test determines the fix, and **"Needs decision:"** when
+the fix picks between behaviours or changes the spec or plan.
+
 Style preferences are **nits**, not findings. They go in one line at the
 end, or are left out.
 
@@ -506,6 +540,7 @@ verdict: attest | escalate | rework
 tier: automated | attested | reviewed
 reviewed-commit: <hash>
 round: <n>
+run: auto | manual
 sampled: no
 live-check: owed | not-needed
 ```
@@ -523,12 +558,13 @@ Each new round goes at the top of the same file. Earlier rounds move below
 
 ### Against rubber-stamping
 
-- **Sampling.** Every fifth attested change is marked `sampled: yes`. After
-  the merge, you read its full diff. Anything you find that the review
+- **Sampling.** Every fifth attested manual change, and every third
+  attested `/auto` change, is marked `sampled: yes`. After the merge, you
+  read its full diff. Anything you find that the review
   missed is a defect in the review: add a pass or a rule, or move the path
   to Reviewed.
 - **Quality per tier.** The scan counts follow-up fixes and reverts per
-  tier. If attested changes need follow-ups more often than reviewed ones,
+  tier and per run kind (auto or manual). If attested changes need follow-ups more often than reviewed ones,
   the tier boundary is in the wrong place.
 - **Time-to-approve is not measured.** Fast approval is not the goal.
 
@@ -555,13 +591,19 @@ The report's `## Live check` section then gives you:
 - you should see: the reply is in German and names the supplier
 ```
 
-Do the steps. If it works, set `live_checked: <date>` and commit it to the
-branch. If it doesn't, leave the date empty and send the change back to
+Do the steps. If it works, set `live_checked: <date>` (or tell Claude you
+ran it and ask it to record the date, or say "live checked" in your `/ship`
+message) and commit it to the branch. If it doesn't, leave the date empty and send the change back to
 rework, or open a fix intent if the defect is out of scope.
 
 **An agent's own run is evidence, never the gate.** The reviewer may run
 the thing and report what it saw; that never fills `live_checked:`.
 `check:intent` fails until the date is there.
+
+Once the project has an automated end-to-end suite, it may stand in for a
+live check, but only when the check is owed by the path rule alone, a named
+scenario covers the changed behaviour, the change is neither new nor
+visual, and `/review` ran the suite itself and it passed.
 
 ---
 
@@ -586,25 +628,99 @@ check that failed:
 Then it:
 1. merges with `git merge --no-ff`;
 2. runs `npm run verify` on `main`;
-3. sets `merged: <hash>` and `status: done`;
-4. moves the row in `plan.md` to Shipped.
+3. sets `merged: <hash>` and `status: done` in a bookkeeping commit;
+4. pushes, if the repository has a remote;
+5. removes the intent's worktree and deletes its branch.
+
+`/ship <id>` does all of this as tested code (`npm run ship`), stopping at
+the first step that fails; re-running it resumes there. `/ship <id>
+--dry-run` changes nothing and reports what would happen. If you ran the
+live check, say so in the same message ("live checked, /ship 4"), and it
+records the date with your words. A worktree folder something still holds
+open is reported as "left for you": close it, then run
+`npm run ship -- <id> --cleanup`.
 
 **Commit `review.md` and any `live_checked:` date to the branch first.** The
 merge check reads the branch from git, so it can't see uncommitted files.
 
-Pushing to a remote, and anything that releases or deploys, stays a separate
-human gate.
+Anything that releases or deploys stays a separate human gate.
 
 ---
 
-## 12. The grid and the scan
+## 12. Parallel sessions
+
+Several intents can run at once, each in its own git worktree with its own
+Claude Code session. The session in the main checkout stays the
+**coordinator**.
+
+```bash
+npm run spawn -- <id>           # worktree ../<name>-wt/<id>-<slug> on the intent's branch
+npm run spawn -- <id> --remove  # after merge; refuses if unmerged, dirty or holding a link
+npm run sessions                # every worktree: status, gates, ±main, dirty, session state
+npm run queue                   # every intent by status (In flight, Queued, Shipped, Stopped)
+```
+
+`/spawn <id>` creates the worktree, runs `npm run setup:worktree` if the
+project defines one (§1 does, once the stack has dependencies), reserves a
+port (5200 + id mod 100) and writes a `CLAUDE.local.md` brief there. If the
+gate the type needs is already recorded, it also launches the implementer in
+the background and offers `/review` when it finishes. Otherwise it hands
+over: open `claude` in the worktree.
+
+`/sessions` turns the table into what needs you now (a session waiting on a
+permission prompt shows as `needs you`), what is ready for review, which
+sessions are behind `main` and need a rebase, and what is stale. Hooks in
+`.claude/settings.json` log each session's start, prompts (by length only,
+never their text), turn ends and notifications to
+`.git/<name>-sessions.jsonl`, which is never committed.
+
+Keep it to about three sessions at once: reviews and merges are serial, so
+more mostly adds rebases.
+
+---
+
+## 13. Auto mode: `/auto`
+
+`/auto <id>`, typed in the coordinator for an accepted intent, runs the
+steps without a prompt between them: spec, plan, spawn, implement, review,
+rework, for at most three review rounds. It ends at **"ready: `/ship
+<id>`"** and never ships.
+
+- **What your message authorises:** recording that intent's
+  `plan_approved` (as `by-agent`, with a comment naming your message), and
+  nothing else. `spec_accepted`, `live_checked` and `/ship` stay yours.
+- **A feature stops once at the spec** for your `spec_accepted`; a yes
+  continues the run.
+- **The coordinator re-checks the review.** It re-runs `verify`,
+  `check:intent` and every surviving mutant itself before writing
+  `review.md`. Any mismatch stops the run.
+- **Rework or decision.** Each finding says "Needs rework:" (the spec, the
+  plan or a test determines the fix) or "Needs decision:" (it picks between
+  behaviours or changes the spec or plan). The first kind goes back to the
+  implementer; the second stops the run for you.
+- **It stops** for your questions, a decision, an `escalate` verdict (you
+  read the diff, then `/auto <id>` again), a spec or plan amendment, running
+  out of rounds, an owed live check, a CRITICAL finding, a red it cannot
+  trace, a re-check mismatch, a plan that exists unapproved, a blocked ship
+  dry-run, a worktree held by another session, or a fourth open session.
+- **Every stop is visible.** It writes `auto_round` and `auto_stopped` into
+  `metadata.yml`, and `npm run sessions` and `npm run queue` show
+  `auto · r<n> · <reason>`. Closing the session pauses the run; `/auto
+  <id>` in a new one resumes from the recorded round.
+- **Sampling is tighter.** Reviews of auto runs say `run: auto`, and every
+  third attested one gets a post-merge full read (every fifth for manual
+  runs).
+
+---
+
+## 14. The grid and the scan
 
 `docs/sdlc-grid.md` scores the project on six stages:
 
 | Stage | L1 · by hand | L2 · codified | L3 · triggered | L4 · closed loop |
 | --- | --- | --- | --- | --- |
 | Intent | intents written with an assistant, type declared, accepted | `/intent` produced it (stamped) | a report or monitor drafts the intent | intents drafted and ranked unattended |
-| Design | `spec.md` by hand | a `/spec` skill | accepting an intent fires the spec | specs unattended; only concerns reach you |
+| Design | `spec.md` by hand | `/spec` produced it (stamped) | accepting an intent fires the spec | specs unattended; only concerns reach you |
 | Build | context file; plan approved before code | shared agents; hooks block unsafe actions | a spec fires plan generation | approved plans built unattended where checks carry it |
 | Test | one-command verify; failing test first; security check | protected tests; eval suites | a change fires verification | verification repairs itself within limits |
 | Deploy | written review policy; agentic review on every change | tiers applied automatically; gates as hooks | a verified change fires review | everything up to release unattended |
@@ -613,7 +729,8 @@ human gate.
 A level counts only when its trace exists:
 - **L2 requires a stamp.** Files a skill produced start with
   `<!-- generated-by: <project>/<skill>@<version> -->`. Keep the stamp when
-  you edit such a file.
+  you edit such a file. The scan counts specs and plans made by `/spec` and
+  `/build-plan` apart from hand-written ones.
 - **L3 requires a trigger** (a hook or a schedule) with a run log.
 
 Run `/grid` every few weeks, or at the start of each quarter. It:
@@ -632,7 +749,7 @@ The rules it follows:
 
 ---
 
-## 13. Your first intent: §1
+## 15. Your first intent: §1
 
 A new project has no product code and an undecided (or tentative) stack.
 §1 is the feature that sets the project up. Start it with:
@@ -658,13 +775,16 @@ By the time §1 merges, it should have:
    rule 1: entry points, UI, integration adapters.
 7. **Replaced the "by meaning" list** in the Reviewed tier with real paths:
    prompts, user-facing output, credential handling, personal data.
+8. **Defined `npm run setup:worktree`** if a fresh worktree needs its
+   dependencies installed (`npm ci`, `uv sync`, …) before `verify` passes,
+   so `/spawn` can prepare one.
 
 §1 changes the review policy and the checker, so it is a Reviewed-tier
 change: read its diff.
 
 ---
 
-## 14. A worked example
+## 16. A worked example
 
 You notice the bot answers German invoices in English.
 
@@ -678,9 +798,9 @@ claude  Created intents/4-reply-language/ (fix). The defect looks like it
         Assumptions: German only for now; other languages are out of scope.
         Next: accept the intent.
 
-you   > accept §4's intent, and draft the plan
+you   > accept §4's intent, then /build-plan 4
 
-claude  Recorded intent_accepted: 2026-10-20 (on your request). Plan drafted
+claude  Recorded intent_accepted: 2026-10-20 by-agent. Plan drafted
         in intents/4-reply-language/plan.md: 3 subtasks, the language
         detection in src/core/language.py, the prompt in
         src/prompts/reply.md. Note that the prompt path is Reviewed tier.
@@ -688,7 +808,7 @@ claude  Recorded intent_accepted: 2026-10-20 (on your request). Plan drafted
 you   (read the plan, tweak a subtask)
 you   > approve the plan for §4 and implement it
 
-claude  Recorded plan_approved. Branch fix/4-reply-language in a worktree;
+claude  Recorded plan_approved: 2026-10-20 by-agent. Branch fix/4-reply-language in a worktree;
         the implementer wrote the failing test first (red), then the fix
         (green). verify green, check:intent PASS, status: in-review.
 
@@ -700,25 +820,32 @@ claude  verdict: escalate · tier: reviewed (src/prompts/** is Reviewed).
         fixtures/invoice-de.txt → you should see a German reply naming the
         supplier.
 
-you   (run it, see a German reply, set live_checked: 2026-10-21, commit)
-you   (read the diff)
-you   > merge §4
+you   (run it, see a German reply, read the diff)
+you   > live checked: the reply was German and named the supplier. /ship 4
 
-claude  Checks pass: review committed at the reviewed commit, check:intent
-        PASS, live check recorded. Merged (a1b2c3d), verify green on main,
-        metadata and plan.md updated.
+claude  live_checked recorded with your words. Checks pass: review
+        committed at the reviewed commit, check:intent PASS. Merged
+        (a1b2c3d), verify green on main, metadata updated, worktree and
+        branch removed. No remote, so nothing pushed.
 ```
 
 ---
 
-## 15. Everyday commands
+## 17. Everyday commands
 
 | Command | What it does |
 | --- | --- |
 | `/intent [--type] <text>` | draft an intent |
+| `/spec <id>` | draft a feature's spec |
+| `/build-plan <id>` | draft the plan |
 | `/review [branch]` | run the review policy and write `review.md` |
+| `/ship <id> [--dry-run]` | merge a reviewed intent, bookkeep, push, clean up |
+| `/spawn <id> [--remove]` | a worktree and a session for one intent |
+| `/sessions` | what every session is doing, and what needs you |
+| `/auto <id>` | spec → plan → build → review on its own, up to "ready: /ship" |
 | `/grid` | refresh `docs/sdlc-grid.md` |
 | `npm run verify` | the one check before a change is done |
+| `npm run queue [-- --next-id]` | every intent by status, generated from `metadata.yml` |
 | `npm run check:intent [-- <branch>]` | does this change match its intent? |
 | `npm run sdlc:scan [-- --since YYYY-MM-DD] [--json]` | the evidence for the grid |
 | `npm run test:kit` | the kit's own tests |
@@ -727,12 +854,12 @@ Phrases the coordinator understands as explicit requests:
 - "accept §N's intent", "accept the spec for §N", "approve the plan for §N"
 - "implement §N"
 - "review §N", or `/review`
-- "merge §N"
-- "push" (when there is a remote)
+- "/ship N" (add "live checked" when you ran the check)
+- "/auto N"
 
 ---
 
-## 16. FAQ and troubleshooting
+## 18. FAQ and troubleshooting
 
 **`check:intent` says the branch "carries no intent id".**
 You're on `main` or on a branch without `<prefix>/<id>-<slug>`. That is
@@ -765,7 +892,13 @@ about deciding, not about length.
 
 **Can an agent merge or push for me automatically?**
 No. Each merge, push, branch deletion or worktree removal needs your
-explicit request, in the current conversation, for that change.
+explicit request, in the current conversation, for that change. `/auto`
+stops at "ready: `/ship <id>`"; the ship is always your message.
+
+**Where did `plan.md` go?**
+Earlier versions of the kit had a hand-kept root `plan.md` holding the
+queue. The queue is now generated from `metadata.yml` (`npm run queue`), so
+it can't drift, and `OVERVIEW.md` holds the short snapshot.
 
 **How do I change the rules?**
 Edit `REVIEW-POLICY.md`, `intents/README.md` or the skills through an
@@ -781,15 +914,19 @@ projects created afterwards.
 
 ---
 
-## 17. Glossary
+## 19. Glossary
 
 - **Intent**: a written statement of a problem and the outcome wanted.
   The unit of work, with id `§N`.
 - **Type**: feature, fix, refactor, adjustment or experiment. Decides the
   artefacts and gates.
-- **Gate**: a human decision recorded as a date in `metadata.yml`.
-- **Coordinator**: the Claude Code session in the main checkout. It owns
-  `plan.md` and runs the skills.
+- **Gate**: a human decision recorded as a date in `metadata.yml`
+  (followed by `by-agent` when an agent wrote it on your request).
+- **Coordinator**: the Claude Code session in the main checkout. It runs
+  the skills, and is the only session that runs `/spawn`, `/review` and
+  `/auto`.
+- **Queue**: the intents by status, generated by `npm run queue` from each
+  `metadata.yml`. Nobody edits it.
 - **Tier**: how much human reading a merge needs: Automated, Attested or
   Reviewed.
 - **Verdict**: the review's conclusion: attest, escalate or rework.
