@@ -45,7 +45,7 @@ which `npm run queue -- --next-id` prints.
   (`plan_approved`, or `intent_accepted` for an adjustment or experiment),
   `/spawn` also launches the implementer in the background there, and
   reports back with an offer of `/review`. Otherwise open `claude` in the
-  worktree; that session implements. Keep it to about five at once.
+  worktree; that session implements. Keep it to about three at once.
 
 Either way, the build ends with `npm run verify` green and
 `status: in-review`.
@@ -146,7 +146,7 @@ to 5 without a prompt between them, and ends at step 6's door:
   a live check owed, a CRITICAL finding, a red it cannot trace, a mismatch
   in the re-check, a plan that exists unapproved, a blocked ship dry-run, an
   agent error, a worktree held by another session, or a
-  sixth open session. Each stop writes `auto_round` and
+  fourth open session. Each stop writes `auto_round` and
   `auto_stopped` into `metadata.yml`, shows in `npm run sessions` and
   `npm run queue` as `auto · r<n> · <reason>`, and sends a push notification
   when the session has the tool.

@@ -24,9 +24,9 @@ You are the **coordinator** (the main checkout). This skill wraps
    Spawning doesn't require gates, because a session can draft the missing
    spec or plan. But say which gates are still empty, because the session
    may not write code before them.
-3. **Check the load.** Run `npm run sessions`. If five or more intent
+3. **Check the load.** Run `npm run sessions`. If three or more intent
    sessions are already open (anything not `closed`) or implementers you
-   launched are still running, say so and ask before adding a sixth.
+   launched are still running, say so and ask before adding a fourth.
    Merges are serial and the owner reviews each one, so more sessions
    mostly add waiting.
 4. **Spawn.** `npm run spawn -- <id>`. The script refuses an intent with an

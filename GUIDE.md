@@ -21,7 +21,10 @@ disagree, the project files win.
 6. [Types: choosing the right path](#6-types-choosing-the-right-path)
 7. [Gates and `metadata.yml`](#7-gates-and-metadatayml)
 8. [`check:intent`: the type check](#8-checkintent-the-type-check)
+   - [Dependencies: `blocked_by`](#dependencies-blocked_by)
+   - [Architecture and the size budget](#architecture-and-the-size-budget)
 9. [Review: tiers, passes, verdicts](#9-review-tiers-passes-verdicts)
+   - [KonMari: tidying a reviewed change](#konmari-tidying-a-reviewed-change)
 10. [Live checks](#10-live-checks)
 11. [Merging](#11-merging)
 12. [Parallel sessions](#12-parallel-sessions)
@@ -60,6 +63,10 @@ splits the work along that line:
 - **Claims are checked, not trusted.** `npm run check:intent` verifies that
   the gates were passed before code arrived. The review re-runs everything
   itself and mutation-tests the changed lines.
+- **The architecture is kept, not hoped for.** Written principles
+  (`docs/architecture.md`), a per-file size budget, a review pass for
+  placement and duplication, and a KonMari step that tidies each change
+  before you read it.
 - **The steps can run on their own.** `/auto <id>` carries an accepted
   intent from spec to a merge-ready branch, stopping only for your
   decisions, and `/spawn` runs several intents at once in their own
@@ -129,8 +136,8 @@ It refuses to overwrite a folder that already exists.
 ### Then
 
 Open a **new Claude Code session in the project folder**. The project's
-skills (`/intent`, `/spec`, `/build-plan`, `/review`, `/ship`, `/auto`, and
-the rest) and agents only load there. Then
+skills (`/intent`, `/spec`, `/build-plan`, `/review`, `/konmari`, `/ship`,
+`/auto`, and the rest) and agents only load there. Then
 start §1 (see [section 15](#15-your-first-intent-1)).
 
 ---
@@ -146,13 +153,15 @@ REVIEW-POLICY.md     tiers, review passes, live checks, merge rules
 intents/
   README.md          types, gates, who edits what
   _templates/        intent.md, spec.md, plan.md, metadata.yml
+docs/architecture.md the architecture principles, Enforced or Judged; §1 fills in the layers
 docs/sdlc-grid.md    where the project stands on the L0–L4 grid
-scripts/             check-intent, queue, ship, spawn, sessions, sdlc-scan, and their tests (Node only)
-.claude/skills/      /intent /spec /build-plan /review /ship /spawn /sessions /auto /grid
-.claude/agents/      <name>-implementer, <name>-reviewer
+scripts/             check-intent, blockers, size budget, queue, ship, spawn, sessions, sdlc-scan, and their tests (Node only)
+scripts/size-baseline.json  the line ceiling of every source file over 500 lines (empty at first)
+.claude/skills/      /intent /spec /build-plan /review /konmari /ship /spawn /sessions /auto /grid
+.claude/agents/      <name>-implementer, <name>-reviewer, <name>-konmari
 .claude/settings.json  hooks that log what each session is doing (for /sessions)
 .codex/agents/       the same agents for Codex
-package.json         npm scripts: verify, check:intent, queue, ship, spawn, sessions, sdlc:scan, test:kit
+package.json         npm scripts: verify, check:intent, size:baseline, queue, ship, spawn, sessions, sdlc:scan, test:kit
 ```
 
 The kit's scripts need no `npm install`. Your product's stack arrives with
@@ -165,10 +174,11 @@ The kit's scripts need no `npm install`. Your product's stack arrives with
 | Role | Who | Does | Never does |
 | --- | --- | --- | --- |
 | **Owner** | you | accepts intents and specs, approves plans, runs live checks, approves merges | — |
-| **Coordinator** | the Claude Code session in the main checkout | runs the skills (`/intent`, `/spec`, `/build-plan`, `/review`, `/spawn`, `/sessions`, `/auto`, `/grid`); records a gate when you ask; ships when you ask | merges, pushes or records gates on its own initiative |
+| **Coordinator** | the Claude Code session in the main checkout | runs the skills (`/intent`, `/spec`, `/build-plan`, `/review`, `/konmari`, `/spawn`, `/sessions`, `/auto`, `/grid`); records a gate when you ask; ships when you ask | merges, pushes or records gates on its own initiative |
 | **Spawned session** | a Claude Code session in an intent's worktree (`/spawn`) | the implementer for that one intent; may draft its missing spec or plan | merges, works on other intents |
 | **Implementer** | the `<name>-implementer` agent, in its own branch or worktree | builds an approved plan, tests first; appends to `## Progress`; sets `status: in-review` | edits the plan, records gates (a subagent never does), touches `main`, pushes, merges |
 | **Reviewer** | the `<name>-reviewer` agent, called by `/review` | runs the passes, read-only; reports findings | modifies files (only `/review` writes `review.md`) |
+| **KonMari agent** | the `<name>-konmari` agent (Opus), called by `/konmari` or `/auto` after a review reaches attest or escalate | tidies the intent's own diff: duplication, dead code, names; writes `konmari.md` | changes behaviour, a test assertion, the spec, the plan or a gate; adds a dependency; ships |
 
 Two rules matter more than the rest:
 
@@ -195,6 +205,7 @@ Two rules matter more than the rest:
  APPROVE      ─────────────────────────────→     plan_approved: <date>
                    implementer builds       →     code, tests, ## Progress
                    /review                  →     review.md (verdict)
+                   /konmari (tidy-up)       →     konmari.md, ## KonMari check
  LIVE CHECK   ─────────────────────────────→     live_checked: <date>  (if owed)
  MERGE        ─────────────────────────────→     merge commit, merged:, status: done
 ```
@@ -213,7 +224,9 @@ The skill:
 - reads what already exists (`OVERVIEW.md`, the queue, earlier intents,
   `docs/`, and the code for a fix);
 - asks **at most one round** of questions;
-- creates `intents/<id>-<slug>/intent.md` and `metadata.yml`.
+- creates `intents/<id>-<slug>/intent.md` and `metadata.yml`, with
+  `blocked_by:` filled in when the intent cannot be built until another one
+  is merged (see [Dependencies](#dependencies-blocked_by)).
 
 There is no queue row to add: `npm run queue` is generated from the
 `metadata.yml` files, and lists the intent once it is committed.
@@ -253,6 +266,10 @@ it's right.
 - the goal and the risks;
 - **Verified against the codebase**: every file and symbol the plan relies
   on, re-read on current `main`;
+- **Where this goes**: the modules it touches, each new module with its
+  one-sentence job, why there (against `docs/architecture.md`), and a
+  `budget:` line for any big file that must grow past its ceiling (see
+  [the size budget](#architecture-and-the-size-budget));
 - small ordered subtasks;
 - the test contract;
 - the validation steps.
@@ -263,6 +280,9 @@ means the spec (or a fix's intent) is incomplete, so it stops and says so.
 **Your gate:** `plan_approved: <date>`. No code before this. `check:intent`
 fails a change whose code came first.
 
+If the plan finds a hard prerequisite (this cannot be built correctly until
+another intent is merged), it records it in `blocked_by:`.
+
 If the plan turns out wrong mid-build, the implementer stops and reports.
 You fix the plan and re-approve it; the build doesn't push through.
 
@@ -272,7 +292,8 @@ Ask the coordinator to build it: "implement §4", or run `/spawn 4` to build
 it in its own worktree alongside other work (see
 [section 12](#12-parallel-sessions)). Either way the branch is
 `<prefix>/<id>-<slug>`, and the approved plan goes to the implementer
-agent. The implementer:
+agent. `/spawn` refuses while a `blocked_by` blocker hasn't merged. The
+implementer:
 
 - writes tests first (for a fix: a test that fails before the fix);
 - commits early and often;
@@ -287,7 +308,7 @@ agent. The implementer:
 Run `/review` (optionally `/review <branch>`) from the coordinator. It:
 - runs `npm run verify` and `npm run check:intent`;
 - decides the **tier**;
-- runs the **nine passes**;
+- runs the **ten passes**;
 - writes `intents/<id>-<slug>/review.md` with a **verdict** and a
   **live-check** line.
 
@@ -298,6 +319,17 @@ See [section 9](#9-review-tiers-passes-verdicts).
 | `rework` | something must change | the implementer fixes it, then `/review` again (round 2, 3, …) |
 | `attest` | no findings that need rework | read the report; merge if you agree |
 | `escalate` | the tier is Reviewed | read the report **and the diff**, then merge |
+
+### Step 5a: KonMari (feature, fix, refactor)
+
+Once the review says `attest` or `escalate`, run `/konmari <id>` (`/auto`
+runs it for you). A fresh agent tidies **this intent's own change**:
+duplication inside the diff and with code it copies, dead code, names that
+differ from their neighbours. Behaviour doesn't change. The coordinator
+re-runs `verify`, `check:intent` and the mutants the review killed, and
+reverts the tidy-up if anything fails. It is not a review round and never
+stops the run. Your diff read and the live check then cover the tidied code.
+See [KonMari](#konmari-tidying-a-reviewed-change).
 
 ### Step 6: Live check (when owed)
 
@@ -311,7 +343,8 @@ date. See [section 10](#10-live-checks).
 Commit `review.md` (and the `live_checked:` date) to the branch. Then run
 `/ship 4` (or `/ship 4 --dry-run` to only ask "can it ship?"). Before
 merging, it checks three things and refuses if any fails:
-- the review covers exactly what is being merged;
+- the review covers exactly what is being merged (plus the KonMari commits
+  `konmari.md` lists);
 - `check:intent` passes;
 - no live check is outstanding.
 
@@ -373,12 +406,15 @@ spec_accepted:           # feature only
 plan_approved: 2026-10-21
 live_checked:            # only when review.md says live-check: owed
 merged:
+konmari:                 # empty, or skip (your words in a comment); not a gate
 auto_authorized:         # /auto only; not a gate
 auto_round:
 auto_stopped:
 follows_up: 2
 links:
   - intents/2-intake
+blocked_by:              # hard prerequisites; not a gate
+  - 3    needs the language detector §3 adds
 ```
 
 ### The gates
@@ -440,6 +476,11 @@ It verifies that:
 - the change's **shape** fits its type (adjustment size, a fix carrying a
   test, a refactor not deleting test lines, core code changing with tests);
 - a live check the review says is owed has been recorded;
+- every `blocked_by` blocker is merged on `main`, and the record names real
+  intents;
+- no budgeted file grew past its ceiling in `scripts/size-baseline.json`
+  without a `budget:` line in the plan;
+- `konmari:` is empty or `skip`;
 - in branch mode, inside the branch's own checkout, `review.md` and
   `metadata.yml` have no uncommitted changes.
 
@@ -458,6 +499,63 @@ of `scripts/intent-check-lib.mjs`:
   is harmless; a config file is not;
 - **core code**: `src/` by default. §1 narrows it to the modules whose
   mistakes cost most.
+
+### Dependencies: `blocked_by`
+
+When one intent cannot be built correctly until another is merged, record
+it in the waiting intent's `metadata.yml`, one blocker per line:
+
+```yaml
+blocked_by:
+  - 13    its test checks the growth §13 adds
+```
+
+- **It is not a gate.** Any agent drafting or revising an intent, spec or
+  plan writes it without your yes, and it never blocks recording a gate.
+  Related work that doesn't block goes in `links:`.
+- **A blocker is cleared** when `main`'s `metadata.yml` for it has a
+  non-empty `merged:`, whatever its branch says.
+- **It holds back building, not drafting.** Spec and plan can go ahead.
+  `npm run spawn` refuses the intent, `/auto` stops before spawning with
+  `auto_stopped: blocked by <n>`, and `check:intent` FAILs the branch.
+- **A broken record fails too**: an id that exists nowhere, a non-numeric
+  id, or the intent's own id.
+- `npm run queue` shows `blocked by §14 (§13)`: the direct open blockers,
+  then those reached through them. Cycles and broken records are listed
+  under "Problems".
+- There is no override flag. Editing `blocked_by` is the override.
+
+### Architecture and the size budget
+
+`docs/architecture.md` is the one place the project's architecture
+principles are written. Each is marked:
+- **Enforced**: a lint rule, a test or `check:intent` fails when it breaks;
+- **Judged**: review pass 10 reads the plan's "Where this goes" section and
+  the diff against it.
+
+The kit ships generic principles (logic in the core, one source of truth,
+no duplicated code, modules with one job, few dependencies, testable logic,
+written-down decisions). The layers and what each may import are §1's to
+fill in. A new layer, boundary or exception goes into the file, with its
+reason, in the change that needs it.
+
+**The size budget** keeps big files from growing unnoticed:
+- a hand-written source file over **500 lines** gets a ceiling in
+  `scripts/size-baseline.json`;
+- a change may not grow a file past its ceiling, and a ceiling may rise by
+  at most **50 lines per intent**, and only with a line in the plan's
+  "Where this goes": `budget: src/core/engine.py +30: <reason>`;
+- a change that shrinks a budgeted file lowers its ceiling in the same
+  commit (`npm run size:baseline -- --write`). The ceiling never goes back
+  up without a `budget:` line;
+- an adjustment or experiment has no plan, so an over-budget one is a ROUTE.
+
+Which files count is set at the top of `scripts/size-budget-lib.mjs`
+(`BUDGETED`, `BUDGET_EXCLUDE`). The default covers source files in common
+languages under `src/`, `scripts/`, `server/`, `tools/`, `lib/` and `app/`,
+and leaves out tests, generated and vendored code. §1 narrows it to the
+stack. The baseline starts empty (`{}`), so the budget applies from the
+first file that crosses 500 lines.
 
 ---
 
@@ -488,7 +586,7 @@ as Reviewed.
 including the Not-checked list, and I take responsibility." That the AI
 missed something is not a defence.
 
-### The nine passes
+### The ten passes
 
 | # | Pass | Asks |
 | --- | --- | --- |
@@ -501,6 +599,7 @@ missed something is not a defence.
 | 7 | Documentation | do `README.md` and `CLAUDE.md` still describe what exists? |
 | 8 | Guardrails and hygiene | lint, warning cap, dependencies justified, no secrets or user data committed, no unescaped input reaching a shell, SQL or HTML |
 | 9 | Repository footguns | recurring bug classes specific to this project; this list grows from findings |
+| 10 | **Architecture** | does the code sit in the right layer and module, against `docs/architecture.md` and the plan's "Where this goes"? Is anything duplicated? Does the KonMari record stay within its reach? |
 
 **Pass 4, mutation testing**, matters most. For every changed line of
 behaviour, the reviewer:
@@ -514,6 +613,11 @@ behaviour, the reviewer:
 Mutations come from the diff, one per changed line, not from a mental list
 of what the feature should do. The reviewer restores each file from a
 backup and ends with a clean `git status`.
+
+**Pass 10, architecture**, cites principles by number. A wrong layer, a
+misplaced module or duplicated code is "Needs rework:". A real trade-off, a
+new exception or a new layer is "Needs decision:", and once you decide it
+goes into `docs/architecture.md`.
 
 ### Findings and severities
 
@@ -568,6 +672,38 @@ Each new round goes at the top of the same file. Earlier rounds move below
   the tier boundary is in the wrong place.
 - **Time-to-approve is not measured.** Fast approval is not the goal.
 
+### KonMari: tidying a reviewed change
+
+Agents like to duplicate code. The KonMari step is the last of six steps
+for AI-assisted work (align, test-build, tear-down, amend, check, KonMari):
+once the change works and is reviewed, ask for a Marie-Kondo-style clean-up
+of what was just written.
+
+- **When.** After a review round reaches `attest` or `escalate`, for a
+  feature, fix or refactor; `/auto` runs it, or you run `/konmari <id>`.
+  Never for an adjustment or experiment. `konmari: skip` in `metadata.yml`
+  (with your words in a comment) skips it for one intent.
+- **Reach.** Only the lines the intent added or changed, existing code they
+  duplicate, dead code the change left, and names or patterns that differ
+  from their neighbours. A bigger cleanup it notices goes into the record
+  as a proposed `refactor` intent.
+- **Held constant.** No test assertion changed or case deleted, no new
+  dependency, no lint suppression, no warning-cap rise, no file moved out of
+  its layer. A ceiling in the size baseline may only go down.
+- **Checked.** The coordinator re-runs `verify`, `check:intent` and every
+  mutant the review killed on a changed file, and the reviewer reads only
+  the tidy-up commits. A `## KonMari check` section is appended to
+  `review.md`.
+- **Discarded, never blocking.** If any check fails, the tidy-up commits
+  are reverted (`outcome: discarded` with a `reason:` line) and the work
+  goes on as if nothing had been tidied.
+- **The record.** `intents/<id>-<slug>/konmari.md` holds `outcome: kept`,
+  `discarded` or `nothing to tidy`, the tidy-up commits under
+  `## Tidied` (and their reverts under `## Reverted`), what was looked at
+  and left, and proposed refactors. `/ship --dry-run` reports the outcome.
+- **Not a review round.** `reviewed-commit` stays where it was; `/ship`
+  accepts the commits `konmari.md` lists after it, and no others.
+
 ---
 
 ## 10. Live checks
@@ -619,8 +755,10 @@ check that failed:
    - The branch's committed `review.md` says `attest` or `escalate`.
    - Its `reviewed-commit` is an ancestor of the branch. A rebase since the
      review means a new round.
-   - Nothing but that intent's `review.md` or `metadata.yml` changed since
-     the reviewed commit.
+   - Every commit since the reviewed commit touches only that intent's
+     `review.md`, `metadata.yml` or `konmari.md`, or is a KonMari tidy-up
+     commit (or its revert) that `konmari.md` lists. A merge commit, or any
+     other commit, blocks.
 2. `npm run check:intent <branch>` reports PASS, or ROUTE with the reason
    stated in `review.md`.
 3. No live check is outstanding.
@@ -660,7 +798,9 @@ npm run sessions                # every worktree: status, gates, ±main, dirty, 
 npm run queue                   # every intent by status (In flight, Queued, Shipped, Stopped)
 ```
 
-`/spawn <id>` creates the worktree, runs `npm run setup:worktree` if the
+`/spawn <id>` refuses an intent whose `blocked_by` blockers haven't merged
+yet (see [Dependencies](#dependencies-blocked_by)). Otherwise it creates the
+worktree, runs `npm run setup:worktree` if the
 project defines one (§1 does, once the stack has dependencies), reserves a
 port (5200 + id mod 100) and writes a `CLAUDE.local.md` brief there. If the
 gate the type needs is already recorded, it also launches the implementer in
@@ -694,10 +834,17 @@ rework, for at most three review rounds. It ends at **"ready: `/ship
 - **The coordinator re-checks the review.** It re-runs `verify`,
   `check:intent` and every surviving mutant itself before writing
   `review.md`. Any mismatch stops the run.
+- **It tidies before it stops.** An `attest` or `escalate` verdict first
+  runs the KonMari step, so your diff read and the live check cover the
+  tidied code. It doesn't use a review round, and a failed tidy-up is
+  reverted rather than stopping the run.
 - **Rework or decision.** Each finding says "Needs rework:" (the spec, the
   plan or a test determines the fix) or "Needs decision:" (it picks between
   behaviours or changes the spec or plan). The first kind goes back to the
   implementer; the second stops the run for you.
+- **It waits for blockers.** Spec and plan go ahead, but it stops before
+  spawning while a `blocked_by` blocker is unmerged (`blocked by <n>`) or
+  the record is broken; `/auto <id>` resumes once they are cleared.
 - **It stops** for your questions, a decision, an `escalate` verdict (you
   read the diff, then `/auto <id>` again), a spec or plan amendment, running
   out of rounds, an owed live check, a CRITICAL finding, a red it cannot
@@ -778,6 +925,12 @@ By the time §1 merges, it should have:
 8. **Defined `npm run setup:worktree`** if a fresh worktree needs its
    dependencies installed (`npm ci`, `uv sync`, …) before `verify` passes,
    so `/spawn` can prepare one.
+9. **Filled in `docs/architecture.md`**: the layers, what each may import,
+   and which principles a lint rule or test enforces (prove each import
+   rule fires with a test).
+10. **Narrowed the size budget**: `BUDGETED` and `BUDGET_EXCLUDE` in
+    `scripts/size-budget-lib.mjs` to the stack's source files (generated
+    code excluded), then `npm run size:baseline -- --write`.
 
 §1 changes the review policy and the checker, so it is a Reviewed-tier
 change: read its diff.
@@ -839,6 +992,7 @@ claude  live_checked recorded with your words. Checks pass: review
 | `/spec <id>` | draft a feature's spec |
 | `/build-plan <id>` | draft the plan |
 | `/review [branch]` | run the review policy and write `review.md` |
+| `/konmari <id>` | tidy a reviewed change; reverted if any check fails |
 | `/ship <id> [--dry-run]` | merge a reviewed intent, bookkeep, push, clean up |
 | `/spawn <id> [--remove]` | a worktree and a session for one intent |
 | `/sessions` | what every session is doing, and what needs you |
@@ -846,7 +1000,8 @@ claude  live_checked recorded with your words. Checks pass: review
 | `/grid` | refresh `docs/sdlc-grid.md` |
 | `npm run verify` | the one check before a change is done |
 | `npm run queue [-- --next-id]` | every intent by status, generated from `metadata.yml` |
-| `npm run check:intent [-- <branch>]` | does this change match its intent? |
+| `npm run check:intent [-- <branch>]` | does this change match its intent (gates, shape, blockers, size budget)? |
+| `npm run size:baseline [-- --write]` | measure the size budget; `--write` rewrites `scripts/size-baseline.json` |
 | `npm run sdlc:scan [-- --since YYYY-MM-DD] [--json]` | the evidence for the grid |
 | `npm run test:kit` | the kit's own tests |
 
@@ -876,6 +1031,19 @@ a ROUTE with a stated reason can merge.
 **FAIL: "review.md or metadata.yml has changes not committed".**
 The merge check reads git, not your disk. Commit the report and the date
 to the branch, then re-run.
+
+**FAIL: "§N is blocked by §M, which is not merged into main".**
+§M is in `blocked_by:`. Ship §M first, or, if it isn't really a hard
+prerequisite, remove the line (related work belongs in `links:`).
+
+**FAIL: "Size budget: … has N lines, over its ceiling".**
+The change grew a big file. Move the new code somewhere it belongs, or add
+`budget: <path> +<n>: <reason>` under the plan's "Where this goes" and raise
+the ceiling in `scripts/size-baseline.json` by at most 50.
+
+**`/ship` refuses: "changed since the reviewed commit besides …".**
+A commit arrived after the review that isn't the review, the metadata or a
+KonMari commit listed in `konmari.md`. Run a new review round.
 
 **`/review` says `rework`, but the only error is an owed live check.**
 That one isn't rework: the live check is yours to clear. The review notes it
@@ -941,3 +1109,10 @@ projects created afterwards.
   caused the defect.
 - **Core code**: the paths in `CORE_CODE` whose changes need tests and
   can't be adjustments.
+- **Blocker**: an intent named in another's `blocked_by:`; it must be
+  merged before the other is built.
+- **Size budget**: the line ceiling, in `scripts/size-baseline.json`, of
+  every source file over 500 lines.
+- **Where this goes**: the plan section that places the change, against
+  `docs/architecture.md`.
+- **KonMari**: the tidy-up step after review; its record is `konmari.md`.
