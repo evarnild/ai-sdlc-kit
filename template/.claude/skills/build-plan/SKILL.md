@@ -3,11 +3,11 @@ name: build-plan
 description: Draft or revise the plan (intents/<id>-<slug>/plan.md) for an accepted {{NAME}} feature, fix or refactor, stamped as made by this skill. Use after spec_accepted (feature) or intent_accepted (fix, refactor) is recorded, or when a review sends its plan back. Invoke as /build-plan <id>.
 metadata:
   owner: {{OWNER}}
-  version: 0.2.0
+  version: 0.3.0
   scope: repository
   status: experimental
   review-tier: reviewed
-  ported-from: heraklios/build-plan@0.1.0
+  ported-from: heraklios/build-plan@0.2.0
 ---
 
 # /build-plan — draft and validate an intent's plan
@@ -16,7 +16,7 @@ Follow `intents/README.md` → "Drafting an artefact" for everything the three
 drafting skills share. This file adds only what is the plan's own. It is not
 Claude Code's plan mode, and it writes `plan.md` in the intent's folder.
 
-Stamp: `<!-- generated-by: {{NAME}}/build-plan@0.2.0 -->` as the first line
+Stamp: `<!-- generated-by: {{NAME}}/build-plan@0.3.0 -->` as the first line
 of `plan.md`.
 
 ## 1. Check the preconditions, and stop if one fails
@@ -48,6 +48,11 @@ here.
   once there is one, plus anything specific;
 - **Verified against the codebase**: "Re-read on `main` at `<hash>`", then
   `path:line — what is there` for each reliance;
+- **Where this goes** (between Verified and Subtasks): modules touched, new
+  modules each with a one-sentence job, why there against
+  `docs/architecture.md`, and any `budget: <path> +<n>: <reason>` line a file
+  over the size limit needs (`scripts/size-budget-lib.mjs`, at most +50 per
+  intent). Review pass 10 judges it;
 - Subtasks, each committable with `npm run verify` green;
 - Tests: for each behavioural line, the test that would fail if it were
   mutated; for a fix, the failing-first test;
@@ -66,5 +71,8 @@ here.
 
 ## 6. Report
 
+If the plan found a hard prerequisite (this intent cannot be built correctly
+until another is merged), add it to `blocked_by:` in `metadata.yml` as
+`<id>    <reason>` (not a gate; related work stays in `links:`) and say so here.
 Name the folder, the weak points, and the next step: "approve by setting
 `plan_approved: <date>` in metadata.yml, or say yes".

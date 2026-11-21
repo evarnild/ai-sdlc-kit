@@ -1,5 +1,5 @@
 import { describe, it } from 'node:test';
-import { expect } from './expect.mjs';
+import { each, expect } from './expect.mjs';
 import {
   ADJUSTMENT_LIMITS,
   checkChange,
@@ -447,5 +447,51 @@ describe('auto fields', () => {
     expect(parseMetadata('auto_stopped: live check owed  # note\n').auto_stopped).toBe('live check owed');
     expect(parseMetadata('auto_stopped: live check owed\n').auto_stopped).toBe('live check owed');
     expect(parseMetadata('auto_stopped: cut # here\n').auto_stopped).toBe('cut');
+  });
+});
+
+describe('checkChange and blocked_by', () => {
+  const withBlocked = (items, blockers) => base({ metadata: meta({ blocked_by: items }), blockers });
+
+  it('fails on an open direct blocker, naming both intents', () => {
+    const r = checkChange(withBlocked(['13    needs the growth'], [{ id: '13', reason: 'needs the growth', state: 'open' }]));
+    expect(r.errors).toEqual(['§27 is blocked by §13, which is not merged into main (needs the growth).']);
+  });
+  it('fails on an unknown blocker and on a broken record', () => {
+    const r = checkChange(withBlocked(['99    x', 'x    y', '27    me'], [{ id: '99', reason: 'x', state: 'unknown' }]));
+    expect(r.errors).toEqual([
+      'intents/27-drift-log/metadata.yml: blocked_by item "x    y": "x" is not an intent id (digits).',
+      'intents/27-drift-log/metadata.yml: blocked_by item "27    me": an intent cannot block itself.',
+      'intents/27-drift-log/metadata.yml: blocked_by names §99, which is on no branch.',
+    ]);
+  });
+  it('notes an item without a reason, without failing', () => {
+    const r = checkChange(withBlocked(['13'], [{ id: '13', reason: '', state: 'cleared' }]));
+    expect(r.errors).toEqual([]);
+    expect(r.notes).toContain('intents/27-drift-log/metadata.yml: blocked_by item "13": no reason given.');
+  });
+  it('passes with cleared blockers, with none, and without the field', () => {
+    expect(checkChange(withBlocked(['13    r'], [{ id: '13', reason: 'r', state: 'cleared' }])).errors).toEqual([]);
+    expect(checkChange(withBlocked([], [])).errors).toEqual([]);
+    expect(checkChange(base()).errors).toEqual([]);
+  });
+});
+
+describe('konmari key (§61 AC8)', () => {
+  const withKonmari = (value) => checkChange(base({ metadata: meta({ konmari: value }) }));
+
+  each([['skip'], [[]]])('accepts %j', (value) => {
+    expect(withKonmari(value).errors).toEqual([]);
+  });
+
+  it('accepts a metadata.yml with no konmari key and one that skips with a comment', () => {
+    expect(checkChange(base()).errors).toEqual([]);
+    const parsed = parseMetadata('id: 27\ntype: fix\nkonmari: skip   # owner: not worth it\n');
+    expect(parsed.konmari).toBe('skip');
+    expect(checkChange(base({ metadata: { ...meta(), ...parsed } })).errors).toEqual([]);
+  });
+
+  each(['maybe', 'Skip', 'no', 'true', '2026-11-06'])('rejects %j', (value) => {
+    expect(withKonmari(value).errors.join('\n')).toMatch(/konmari must be empty or "skip"/);
   });
 });

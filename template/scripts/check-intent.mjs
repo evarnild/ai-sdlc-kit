@@ -13,7 +13,9 @@
 // read from git, so it can run from any checkout.
 import { execFileSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { blockerState, parseBlockers } from './blockers-lib.mjs';
 import { checkChange, formatResult, parseArgs, parseBranch, parseMetadata, parseReviewHeader } from './intent-check-lib.mjs';
+import { budgetVerdict, checkBudget, countLines, isBudgeted, parseCatFileBatch } from './size-budget-lib.mjs';
 
 let opts;
 try {
@@ -90,7 +92,78 @@ if (!fromBranch) {
   }
 }
 
-const result = checkChange({ branch, metadata, intentDir, intentFiles, diff, review });
+// blocked_by: whether a blocker is merged is read from main, never from this branch.
+const mainIntentDirs = () => {
+  try {
+    return git('ls-tree', '--name-only', 'main:intents').split('\n').filter(Boolean);
+  } catch {
+    return [];
+  }
+};
+const mainMetaOf = (blockerId) => {
+  const dir = mainIntentDirs().find((d) => d.startsWith(`${blockerId}-`));
+  if (!dir) return null;
+  try {
+    return parseMetadata(git('show', `main:intents/${dir}/metadata.yml`));
+  } catch {
+    return null;
+  }
+};
+const onSomeBranch = (blockerId) =>
+  git('for-each-ref', '--format=%(refname:short)', 'refs/heads')
+    .split('\n')
+    .some((b) => parseBranch(b)?.id === blockerId);
+const blockers = parsed
+  ? parseBlockers(metadata, parsed.id).items.map((b) => ({ ...b, state: blockerState(b.id, mainMetaOf, onSomeBranch) }))
+  : [];
+
+// The size budget (scripts/size-budget-lib.mjs): rules the lint cap can't see.
+const BASELINE = 'scripts/size-baseline.json';
+const tryGit = (...a) => {
+  try {
+    return execFileSync('git', a, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+  } catch {
+    return null;
+  }
+};
+/** Lines of every budgeted file, from the branch's tree or the working tree. */
+function measureBudgeted() {
+  if (!fromBranch) {
+    const tracked = git('ls-files', '--cached', '--others', '--exclude-standard').split('\n');
+    const out = {};
+    for (const path of tracked.filter((p) => p && isBudgeted(p))) {
+      if (existsSync(path)) out[path] = countLines(readFileSync(path, 'utf8'));
+    }
+    return out;
+  }
+  const paths = git('ls-tree', '-r', '--name-only', branch).split('\n').filter((p) => p && isBudgeted(p));
+  const raw = execFileSync('git', ['cat-file', '--batch'], {
+    input: paths.map((p) => `${branch}:${p}\n`).join(''),
+    maxBuffer: 256 * 1024 * 1024,
+  });
+  const texts = parseCatFileBatch(raw, paths.length);
+  return Object.fromEntries(paths.map((p, i) => [p, countLines(texts[i] ?? '')]));
+}
+function checkSizeBudget(type) {
+  const branchText = fromBranch ? tryGit('show', `${branch}:${BASELINE}`) : existsSync(BASELINE) ? readFileSync(BASELINE, 'utf8') : null;
+  const baseText = tryGit('show', `${mergeBase}:${BASELINE}`);
+  if (branchText === null && baseText === null) return { errors: [], routes: [] }; // no baseline yet: the budget is off
+  const planFile = intentFiles.includes('plan.md') ? source.read(`${intentDir}/plan.md`) : '';
+  const failures = checkBudget({
+    measured: measureBudgeted(),
+    baseline: branchText === null ? {} : JSON.parse(branchText),
+    baseBaseline: baseText === null ? null : JSON.parse(baseText),
+    planText: planFile,
+  });
+  return budgetVerdict(failures, type);
+}
+
+const result = checkChange({ branch, metadata, intentDir, intentFiles, diff, review, blockers });
+if (intentDir && result.type) {
+  const budget = checkSizeBudget(result.type);
+  result.errors.push(...budget.errors);
+  result.routes.push(...budget.routes);
+}
 if (fromBranch && intentDir && git('rev-parse', '--abbrev-ref', 'HEAD') === branch) {
   // Branch mode reads git, so a review.md or live_checked: date still sitting
   // uncommitted in this checkout would be invisible to the merge check

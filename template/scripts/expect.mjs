@@ -3,6 +3,7 @@
 // picks. Add a matcher here when a test needs one; keep the names Vitest's.
 // `expect(x).not.<matcher>` negates any of them.
 import assert from 'node:assert/strict';
+import { it } from 'node:test';
 import { isDeepStrictEqual, inspect } from 'node:util';
 
 const show = (v) => inspect(v, { depth: 6, breakLength: Infinity });
@@ -97,4 +98,23 @@ export function expect(actual, message) {
   const matchers = build(actual, message, false);
   matchers.not = build(actual, message, true);
   return matchers;
+}
+
+/**
+ * Vitest's `it.each(cases)(name, fn)` on node:test: one `it` per case. A case
+ * that is an array is spread into `fn`'s arguments; `%s` and `%j` in the name
+ * take the arguments in order (String and JSON).
+ */
+export function each(cases) {
+  return (name, fn) => {
+    for (const c of cases) {
+      const args = Array.isArray(c) ? c : [c];
+      let i = 0;
+      const title = name.replace(/%[sj]/g, (f) => {
+        const v = args[i++];
+        return f === '%j' ? JSON.stringify(v) : String(v);
+      });
+      it(title, () => fn(...args));
+    }
+  };
 }

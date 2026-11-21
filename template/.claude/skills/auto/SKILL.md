@@ -3,11 +3,11 @@ name: auto
 description: Carry one accepted {{NAME}} intent from acceptance to a merge-ready branch without a prompt between the steps, stopping only for the owner's questions and decisions, the feature's spec acceptance, the live check and the ship. Use only when the owner types /auto <id> in the coordinator session. Invoke as /auto <id>.
 metadata:
   owner: {{OWNER}}
-  version: 0.2.0
+  version: 0.3.0
   scope: repository
   status: experimental
   review-tier: reviewed
-  ported-from: heraklios/auto@0.1.0
+  ported-from: heraklios/auto@0.2.0
 ---
 
 # /auto — one intent, from acceptance to "ready: /ship"
@@ -43,8 +43,8 @@ this skill allows, in this conversation.
   branch in its worktree once spawned: read the worktree's copy then) and
   `intent_accepted` is recorded, as a bare date or `<date> by-agent`. If
   not, stop: a run starts from an accepted intent (`/intent` drafts one).
-- `npm run sessions` shows fewer than three other open intent sessions or
-  runs (`CLAUDE.md`, "about three"). If a fourth would open, stop.
+- `npm run sessions` shows fewer than five other open intent sessions or
+  runs (`CLAUDE.md`, "about five"). If a sixth would open, stop.
 - The worktree, once it exists, is not held by a session you didn't start
   (`npm run sessions`: its row is not `working`, `idle` or `needs you`). If it
   is, stop.
@@ -90,6 +90,7 @@ the build step, then round 1.
 | --- | --- |
 | spec questions, spec drafted | step 2: the owner's answers or yes, then step 3 |
 | plan found the spec incomplete, plan.md exists unapproved | step 3 again, only after the owner has settled it; never approve a plan this run did not draft |
+| blocked by N, blocked_by record broken | once every blocker is cleared (merged on `main`) or the record is fixed, step 4: spawn; **no new round** |
 | decision needed, spec or plan amendment needed | give the implementer the owner's answer (a new `{{NAME}}-implementer` if it cannot be resumed), wait, then **a new round** `auto_round` + 1 (step 5, item 1) |
 | re-check mismatch | redo the re-check (step 6) for round `auto_round` and write that round's `review.md`; **no new round**. If the reviewer's report is not in this conversation (a new session), redo the review as the same round, then the re-check |
 | escalate | the owner's `/auto <id>` means "diff read": go on to the live-check stop (step 7) or the ship stop (step 8) from that review's `live-check:`; **no new round** |
@@ -143,6 +144,16 @@ experiment.
 
 ## 4. Build
 
+**Blockers first.** Read `blocked_by` in the intent's `metadata.yml` (items
+`<id>    <reason>`; `npm run queue` shows the open ones as `blocked by §n`). A
+blocker is cleared only when `main`'s `metadata.yml` for it has a non-empty
+`merged:`. If any direct blocker is open, **stop** before spawning with
+`auto_stopped: blocked by <n>` (the lowest open direct id) and report every
+open blocker with its reason. Spec and plan went ahead; only building waits.
+Do not improvise a "waiting for N to merge" stop. A broken record (an id on no
+branch, a non-digit id, the intent's own id) is also a stop: `auto_stopped: blocked_by record
+broken`.
+
 Run `/spawn <id>` (its steps 1 to 5): check the load, `npm run spawn --
 <id>`, then launch `{{NAME}}-implementer` with `run_in_background: true` in
 the worktree. The brief carries what `/spawn` step 5 lists and the safety
@@ -177,7 +188,8 @@ table marks "no new round" does not come through here):
    including `## Type check` with the pasted `npm run check:intent` output and
    the `## Verified myself vs. taken on trust` heading, with `run: auto`.
    Commit it on the branch.
-5. Act on the verdict:
+5. Act on the verdict. For `attest` and `escalate`, **first run the KonMari
+   step (5a)**, then act:
    - **`escalate`**: always stop, `auto_stopped: escalate, owner reads the
      diff`. The Reviewed tier needs the owner's diff read. The owner's next
      `/auto <id>` means "diff read" and goes on to the live-check or ship
@@ -189,6 +201,32 @@ table marks "no new round" does not come through here):
      `n+1` at item 1. A single "Needs decision:" finding stops the run.
    - **`attest`**: `live-check: owed` goes to the live-check stop (step 7);
      `live-check: not-needed` goes to the ship stop (step 8).
+
+### 5a. The KonMari step
+
+Before the stop or the ship stop that an `attest` or `escalate` verdict
+leads to, run `.claude/skills/konmari/SKILL.md`'s steps 1 to 6 (read the
+skill; do not work from memory), so that the owner's diff read and the live
+check both cover the tidied code.
+
+- **Which runs.** Every feature, fix and refactor. It never runs for an
+  adjustment or experiment, nor with `konmari: skip` in `metadata.yml`.
+- **Once, then again only after a later round.** Run it once per run. If a
+  later round (after a live-check defect, step 7) reaches `attest` or
+  `escalate` again, run it once more, covering only the commits since the last
+  KonMari.
+- **Not a round.** It doesn't change `auto_round` or use one of the three
+  rounds. It writes `intents/<id>-<slug>/konmari.md` and a `## KonMari check`
+  section in the round's `review.md`; commit them on the branch, `konmari.md`
+  in its own commit apart from the `§<id> konmari:` tidy-up commits. `reviewed-commit`
+  stays put: `npm run ship` accepts the commits `konmari.md` lists (tidy-ups
+  and, for a discard, their reverts) and the record's own commit after it, and
+  blocks any other.
+- **Never a stop.** A failed check discards the tidy-up (`git revert`,
+  `outcome: discarded`) and the run goes on to the stop or the ship stop as if
+  nothing had been tidied. The step's heavy commands run one at a time, and
+  the step 6 re-check applies to anything it commits before you act.
+- **Safety.** Step 10's rules go into the `{{NAME}}-konmari` brief.
 
 ## 6. The coordinator's re-check
 
@@ -238,7 +276,7 @@ owner runs them.
 red `verify` or `check:intent` you cannot trace to a finding the implementer
 is fixing (`red verify` or `red check:intent`); an agent error or a stopped
 agent (`agent error`); a worktree held by a session you didn't start
-(`worktree held by another session`); a fourth open intent session or run
+(`worktree held by another session`); a sixth open intent session or run
 (`too many sessions`).
 
 ## 8. The ship stop
@@ -295,7 +333,8 @@ Put these in the brief of each agent you launch, and keep them yourself:
 - restore mutants by copy, never `git checkout --`, and finish with `git
   status --short` clean;
 - never kill a process the run didn't start;
-- the implementer sets `status: in-review` and appends to `## Progress` only.
+- the implementer sets `status: in-review` and appends to `## Progress` only;
+- `{{NAME}}-konmari` (step 5a) additionally: never edits `spec.md`, `plan.md`, a gate, an `auto_*` field or `konmari:`; changes only the diff's lines and the code they duplicate; changes no test assertion; adds no dependency.
 
 ## 11. Counting
 

@@ -3,7 +3,7 @@ name: spawn
 description: Start a parallel {{NAME}} session for an intent — a worktree on the intent's branch in ../{{NAME}}-wt/, its own dependencies (npm run setup:worktree, when defined), a reserved port and a CLAUDE.local.md brief — or take one down after merge. Use from the main checkout when the owner wants to work on an intent alongside others. Invoke as /spawn <id> [--base <ref>], or /spawn <id> --remove.
 metadata:
   owner: {{OWNER}}
-  version: 0.2.0
+  version: 0.3.0
   scope: repository
   status: experimental
   review-tier: reviewed
@@ -24,13 +24,16 @@ You are the **coordinator** (the main checkout). This skill wraps
    Spawning doesn't require gates, because a session can draft the missing
    spec or plan. But say which gates are still empty, because the session
    may not write code before them.
-3. **Check the load.** Run `npm run sessions`. If three or more intent
+3. **Check the load.** Run `npm run sessions`. If five or more intent
    sessions are already open (anything not `closed`) or implementers you
-   launched are still running, say so and ask before adding a fourth.
+   launched are still running, say so and ask before adding a sixth.
    Merges are serial and the owner reviews each one, so more sessions
    mostly add waiting.
-4. **Spawn.** `npm run spawn -- <id>` (add `--base <ref>` only when the intent
-   depends on an unmerged branch, and say so). If the intent folder was
+4. **Spawn.** `npm run spawn -- <id>`. The script refuses an intent with an
+   open `blocked_by` blocker (or a broken record) before creating anything;
+   relay its message and stop. There is no override: editing `blocked_by` is
+   the override. A dependency is never a reason for `--base`: add `--base
+   <ref>` only when the owner asks for a stacked branch, and say so. If the intent folder was
    uncommitted here, the script moves it into the worktree. Tell the owner
    that.
 5. **Launch or hand over.** Read the worktree's `metadata.yml`. The gate the

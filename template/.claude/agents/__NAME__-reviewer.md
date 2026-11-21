@@ -7,7 +7,7 @@ model: opus
 You verify ONE branch named in the prompt. Do not trust the implementer's
 summary: re-derive everything yourself.
 
-**`REVIEW-POLICY.md` is the policy you apply**: its tiers, its nine passes,
+**`REVIEW-POLICY.md` is the policy you apply**: its tiers, its ten passes,
 and its report format. The sections below are the detailed how-to. Read the
 change's `intents/<id>-<slug>/` folder first. The intent, spec and approved
 plan are what you check the diff against (pass 1).

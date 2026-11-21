@@ -17,6 +17,7 @@ merges, there is no product code, and no section below describes any.
 ```
 npm run verify        # THE check before a change is done (today: the kit's own tests)
 npm run check:intent  # does this branch's change match its intent? (intents/README.md)
+npm run size:baseline  # measure the size budget; --write rewrites scripts/size-baseline.json (a shrinking change runs it)
 npm run sdlc:scan     # the evidence behind docs/sdlc-grid.md
 npm run queue         # the intent queue, generated from metadata.yml (--next-id, --json); nobody edits it
 npm run spawn -- <id> # parallel session for an intent (see "Parallel sessions")
@@ -45,7 +46,8 @@ rules below or with `intents/README.md` and `REVIEW-POLICY.md`, those win.
 - `/intent` drafts an intent, `/spec` a feature's spec, `/build-plan` a
   plan, `/review` runs `REVIEW-POLICY.md` and writes `review.md`, `/grid`
   refreshes `docs/sdlc-grid.md`, `/spawn` and `/sessions` run parallel work
-  (below), and `/ship <id>` merges a reviewed intent when the owner asks
+  (below), `/konmari <id>` tidies a reviewed change before the live check,
+  and `/ship <id>` merges a reviewed intent when the owner asks
   (`REVIEW-POLICY.md` → "Merging").
 - The `{{NAME}}-implementer` agent builds an approved plan, and the
   `{{NAME}}-reviewer` agent does the adversarial passes for `/review`.
@@ -59,7 +61,7 @@ rules below or with `intents/README.md` and `REVIEW-POLICY.md`, those win.
   on), a spec or plan amendment, running out of rounds, the live check, a
   CRITICAL finding, any red it cannot trace, a re-check mismatch, a plan
   that exists unapproved, a ship dry-run that is blocked, a worktree held by
-  another session, a fourth open session or an agent error, and ends at
+  another session, a sixth open session or an agent error, and ends at
   "ready: `/ship <id>`". It never ships, and never records `spec_accepted`
   or `live_checked` without the owner's yes; the `/auto` authorisation
   covers neither. A stop shows in `npm run sessions` as
@@ -127,7 +129,7 @@ npm run sessions -- --log 30    # the raw event tail
   the coordinator's row reflects only the coordinator's own session.
   Progress shows in the worktree's `status`, `dirty` and `ahead` columns
   (the implementer commits early), and `in-review` means it finished.
-- Keep it to about three intent sessions (or launched implementers) at
+- Keep it to about five intent sessions (or launched implementers) at
   once. Merges and reviews are serial, so more sessions mostly add rebases.
 - Spawned worktrees live outside the repo on purpose, so the project's
   tools never pick up a nested checkout. Each worktree installs its own
@@ -136,12 +138,19 @@ npm run sessions -- --log 30    # the raw event tail
 
 ## Architecture
 
+The principles, how each is checked and the recorded exceptions are in
+`docs/architecture.md`; this section is the module map.
+
 None yet. §1 writes this section: the modules, the boundary between pure,
 tested logic and I/O (model calls, channels, storage), and the conventions
 worth knowing before editing. When it does, it also:
 
 - narrows `CORE_CODE` in `scripts/intent-check-lib.mjs` to the modules whose
   mistakes cost most;
+- fills in `docs/architecture.md` (layers, boundaries and how each
+  principle is enforced), narrows `BUDGETED` and `BUDGET_EXCLUDE` in
+  `scripts/size-budget-lib.mjs` to the stack's source files, and runs
+  `npm run size:baseline -- --write`;
 - names the runtime paths that owe a live check (`REVIEW-POLICY.md` →
   "Live checks", rule 1);
 - names the paths behind the Reviewed tier's "by meaning" list (prompts,

@@ -3,11 +3,11 @@ name: review
 description: Run {{NAME}}'s review policy against a branch and write the review report (intents/<id>-<slug>/review.md) with passes, findings, a Not-checked section and an attest/escalate/rework verdict. Use before merging any {{NAME}} branch into main, or to re-review after rework. Invoke as /review [branch].
 metadata:
   owner: {{OWNER}}
-  version: 0.2.0
+  version: 0.3.0
   scope: repository
   status: experimental
   review-tier: reviewed
-  ported-from: heraklios/review@0.1.5
+  ported-from: heraklios/review@0.2.0
 ---
 
 # /review — the agentic review before you merge
@@ -16,7 +16,7 @@ metadata:
 policy first, every time: it changes, and the version you remember may not
 be current.
 
-Stamp: put `<!-- generated-by: {{NAME}}/review@0.2.0 -->` as the first
+Stamp: put `<!-- generated-by: {{NAME}}/review@0.3.0 -->` as the first
 line of `review.md`.
 
 ## 0. Orient
@@ -63,7 +63,7 @@ which input set the tier. Never lower a tier.
 
 ## 3. Run the passes
 
-Run all nine passes from `REVIEW-POLICY.md`, in order. For each, record
+Run all ten passes from `REVIEW-POLICY.md`, in order. For each, record
 `pass`, `findings (n)`, or `not run — <why>`.
 
 Pass 4 (mutations) is the expensive one, and the one that matters most:

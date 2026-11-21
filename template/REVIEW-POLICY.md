@@ -128,8 +128,16 @@ naming the check that failed:
      <branch>:intents/<id>-<slug>/review.md`) says `attest` or `escalate`.
    - Its `reviewed-commit` is an ancestor of the branch (`git merge-base
      --is-ancestor`). A rebase since the review means a new round.
-   - Nothing but that intent's `review.md` or `metadata.yml` differs between
-     `reviewed-commit` and the branch (`git diff --name-only`).
+   - Every commit after `reviewed-commit` touches only that intent's
+     `review.md`, `metadata.yml` or `konmari.md` (`git log
+     <reviewed-commit>..<branch>` with each commit's files): recording the
+     review and the live check happens on top of the reviewed commit,
+     anything else is unreviewed. The one exception is the KonMari step: a
+     commit whose hash `konmari.md` lists under `## Tidied` or `## Reverted`
+     (the `§<id> konmari:` tidy-up commits and, for a `discarded` outcome,
+     their `git revert` commits) is also accepted, provided it touches
+     nothing inside the intent's folder but `konmari.md`. A merge commit, or
+     any other commit, still blocks.
 2. `npm run check:intent <branch>` reports PASS, or ROUTE with the reason
    already stated in `review.md`.
 3. No live check is owed without `live_checked:` recorded. `check:intent`
@@ -145,7 +153,8 @@ Each pass reports `pass`, `findings`, or `not run` with the reason.
 
 1. **Intent and plan match.** The diff does what `intent.md`'s outcome and
    `plan.md`'s subtasks say, and nothing more. Unplanned scope is a finding,
-   and so is refactoring mixed into a feature.
+   and so is refactoring mixed into a feature, except the commits listed in
+   the intent's `konmari.md` (pass 10).
 2. **Type check.** Run `npm run check:intent` and paste its output. A
    `ROUTE` needs a stated reason or a re-declared type.
 3. **Behaviour against the spec.** Every acceptance criterion in `spec.md`
@@ -157,7 +166,8 @@ Each pass reports `pass`, `findings`, or `not run` with the reason.
    that the file actually changed. Report killed and survived mutants per
    line. A fix must carry a test that failed before the fix.
 5. **Conventions** (`CLAUDE.md`). The architecture boundaries and
-   conventions written there hold.
+   conventions written there hold. The layer and import boundaries in
+   `docs/architecture.md` are pass 10's.
 6. **Numbers in prose.** Every measurement in the intent's `plan.md`, `README.md`, intent
    artefacts and test comments can be reproduced.
 7. **Documentation.** `README.md` documents new behaviour, and `CLAUDE.md`
@@ -170,6 +180,21 @@ Each pass reports `pass`, `findings`, or `not run` with the reason.
 9. **Repository-specific footguns.** This list starts empty and grows from
    findings: when a class of bug recurs, name it here so every later review
    looks for it.
+10. **Architecture** (`docs/architecture.md`). Judge the principles marked
+    *Judged* there against the plan's "Where this goes" section and the
+    diff. Don't restate the principles; cite them by number. The dependency
+    principle stays in pass 8, and the *Enforced* ones are failures of lint,
+    tests or `check:intent` (the size budget), not of this pass. A plan
+    without "Where this goes" is judged on the diff alone. Finding kinds: a
+    wrong layer, a misplaced module, or duplication of existing code is
+    **"Needs rework:"**; a real trade-off, a new exception or a new layer is
+    **"Needs decision:"**, and belongs in `docs/architecture.md`. When the
+    intent has a `konmari.md`, check it too: its commits stay within the
+    KonMari reach (the diff's lines and what they duplicate, and lowering the
+    ceiling of a budgeted file it shrank), change no test assertion and add
+    no dependency; its `outcome:` matches the commits; what it left is
+    recorded. Report the pass as `not run` if `docs/architecture.md` is
+    missing.
 
 **Finding or nit.** A finding is something that is wrong, unproven, or will
 mislead the next person: a spec deviation, a surviving mutant, a stale

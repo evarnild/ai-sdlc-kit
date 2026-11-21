@@ -19,7 +19,8 @@ intents/
     spec.md        what we will build (features only)
     plan.md        how we will build it, approved before code; ends with ## Progress
     review.md      the review report (written by /review, updated in place)
-    metadata.yml   id, type, status, gates, links
+    konmari.md     the KonMari tidy-up record (written by /konmari)
+    metadata.yml   id, type, status, gates, links, blocked_by
   _templates/      what the skills fill in; usable raw by hand
 ```
 
@@ -134,6 +135,20 @@ needs were recorded.
   run stands. None of them is a gate: nothing waits on them, and
   `check:intent` only rejects a malformed value. Write the reason without
   ` #`, which starts a comment.
+- **`blocked_by`.** A list like `links:`, one hard prerequisite per line,
+  `<id>    <reason>` (`- 13    its test checks the growth`). It is **not a
+  gate**: any agent drafting or revising an intent, spec or plan writes it
+  without your yes, and it never changes or blocks recording a gate. Use it
+  only for "cannot be built correctly until that intent is merged"; related
+  work stays in `links:`. A blocker is **cleared** when `main`'s
+  `metadata.yml` for it has a non-empty `merged:`, whatever its branch says.
+  It holds back building, not drafting: `npm run spawn` refuses an intent
+  with an open direct blocker, `/auto` stops before spawn with
+  `auto_stopped: blocked by <n>`, and `check:intent` FAILs the branch (also
+  for an id that exists nowhere, the intent's own id or a non-numeric id).
+  `npm run queue` shows `blocked by §14 (§13)` (the direct open blockers,
+  then those reached through them) and prints cycles and broken records
+  under "Problems".
 - **The implementer agent** may only append to the `## Progress` section at
   the end of its item's `plan.md` and set `status: in-review` when done.
 - **A spawned session** (`npm run spawn`, `CLAUDE.md` → "Parallel
@@ -142,6 +157,17 @@ needs were recorded.
   `spec.md` (`/spec`) or `plan.md` (`/build-plan`) with the skills, then
   stops for you to accept it.
 - **The reviewer / `/review`** writes `review.md` and nothing else here.
+- **The KonMari agent** (`{{NAME}}-konmari`, Opus, launched by `/konmari` or
+  `/auto`) writes `konmari.md` and tidies code: only the lines the intent
+  added or changed and existing code they duplicate, with no test assertion
+  changed or case deleted, no dependency and no lint suppression added.
+  It commits as `§<id> konmari:`, never edits `spec.md`, `plan.md`, a gate, an
+  `auto_*` field or `konmari:`, and never ships or merges. The coordinator
+  appends `## KonMari check` to `review.md` and reverts the commits if the
+  check fails.
+- **`konmari:`** in `metadata.yml` is empty, or `skip` (the owner's choice,
+  with their words in a comment) to skip the tidy-up for one intent. It is not
+  a gate; `check:intent` rejects any other value.
 
 ## Drafting an artefact
 

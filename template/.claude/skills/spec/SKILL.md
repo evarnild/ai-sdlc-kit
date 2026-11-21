@@ -3,7 +3,7 @@ name: spec
 description: Draft or revise the spec (intents/<id>-<slug>/spec.md) for an accepted {{NAME}} feature intent, stamped as made by this skill. Use after intent_accepted is recorded on a feature, or when a review sends its spec back. Invoke as /spec <id>.
 metadata:
   owner: {{OWNER}}
-  version: 0.2.0
+  version: 0.3.0
   scope: repository
   status: experimental
   review-tier: reviewed
@@ -15,7 +15,7 @@ metadata:
 Follow `intents/README.md` → "Drafting an artefact" for everything the three
 drafting skills share. This file adds only what is the spec's own.
 
-Stamp: `<!-- generated-by: {{NAME}}/spec@0.2.0 -->` as the first line of
+Stamp: `<!-- generated-by: {{NAME}}/spec@0.3.0 -->` as the first line of
 `spec.md`.
 
 ## 1. Check the preconditions, and stop if one fails
@@ -66,6 +66,9 @@ Assumptions.
 
 ## 6. Report
 
+If the spec found a hard prerequisite (this intent cannot be built correctly
+until another is merged), add it to `blocked_by:` in `metadata.yml` as
+`<id>    <reason>` (not a gate; related work stays in `links:`) and say so here.
 Name the folder, the weak points, and the next step: "accept by setting
 `spec_accepted: <date>` in metadata.yml, or say yes". After that comes
 `/build-plan <id>`.
