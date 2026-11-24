@@ -21,13 +21,13 @@ describe('countLines', () => {
 });
 
 describe('isBudgeted', () => {
-  each(['src/engine/combat.ts', 'server/saveApi.ts', 'scripts/ship.mjs', 'tools/orchestrator/orchestrator.mjs', 'src/x.js', 'src/pkg/agent.py', 'app/main.go'])(
+  each(['src/engine/combat.ts', 'server/saveApi.ts', 'scripts/deliver.mjs', 'tools/orchestrator/orchestrator.mjs', 'src/x.js', 'src/pkg/agent.py', 'app/main.go'])(
     'budgets %s',
     (p) => expect(isBudgeted(p)).toBe(true),
   );
   each([
     ['a test', 'src/engine/combat.test.ts'],
-    ['an mjs test', 'scripts/ship.test.mjs'],
+    ['an mjs test', 'scripts/deliver.test.mjs'],
     ['e2e', 'e2e/smoke.ts'],
     ['a spec file', 'src/x.spec.ts'],
     ['a pytest file', 'src/pkg/test_agent.py'],

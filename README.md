@@ -25,12 +25,12 @@ stack-agnostic.
 | `REVIEW-POLICY.md` | three review tiers (Automated, Attested, Reviewed), ten review passes including mutation testing and architecture, live checks, merge preconditions |
 | `/intent`, `/spec`, `/build-plan` | draft the intent, the spec and the plan, each stamped by a versioned skill |
 | `/review` | runs the review policy and writes `review.md`; findings say "Needs rework:" or "Needs decision:" |
-| `/ship` (`npm run ship`) | merges a reviewed intent: preconditions, `--no-ff`, verify, bookkeeping, push, worktree and branch removal; stops at the first failing step |
+| `/deliver` (`npm run deliver`) | merges a reviewed intent: preconditions, `--no-ff`, verify, bookkeeping, push, worktree and branch removal; stops at the first failing step |
 | `/spawn`, `/sessions` | one worktree and Claude Code session per intent, and a coordinator view of what every session is doing (fed by hooks) |
 | `blocked_by` | one intent's hard prerequisites; `queue` shows the chain, `spawn` and `/auto` wait for them to merge |
 | `docs/architecture.md` + size budget | numbered principles, *Enforced* or *Judged*; the plan's "Where this goes"; per-file line ceilings in `scripts/size-baseline.json` |
 | `/konmari` | after an attest or escalate review, a fresh agent tidies the intent's own diff (duplication, dead code); the coordinator re-checks and reverts it if anything breaks |
-| `/auto` | carries an accepted intent from spec to "ready: `/ship`" without prompts between steps, stopping only for your decisions |
+| `/auto` | carries an accepted intent from spec to "ready: `/deliver`" without prompts between steps, stopping only for your decisions |
 | `/grid` | scores the project on an L0–L4 grid |
 | implementer, reviewer and KonMari agents | for Claude Code (`.claude/agents/`) and Codex (`.codex/agents/`) |
 | `npm run sdlc:scan` | the evidence behind the grid: intents, stamps, verdicts, throughput beside revert rate, quality per tier and run kind, sampling |

@@ -1,6 +1,6 @@
 ---
 name: new-sdlc-project
-description: Create a new project with the AI-native SDLC kit (intents/ with types and gates, REVIEW-POLICY.md, sdlc.md, the /intent /spec /build-plan /review /konmari /ship /spawn /sessions /auto /grid skills, implementer, reviewer and KonMari agents for Claude and Codex, check:intent with blocked_by and a size budget, docs/architecture.md, a generated queue, sdlc:scan), git-initialised, verified and committed in one step. Use when the user wants to start a new project or repo "with the AI SDLC", "with intents and review gates", or "with the SDLC kit".
+description: Create a new project with the AI-native SDLC kit (intents/ with types and gates, REVIEW-POLICY.md, sdlc.md, the /intent /spec /build-plan /review /konmari /deliver /spawn /sessions /auto /grid skills, implementer, reviewer and KonMari agents for Claude and Codex, check:intent with blocked_by and a size budget, docs/architecture.md, a generated queue, sdlc:scan), git-initialised, verified and committed in one step. Use when the user wants to start a new project or repo "with the AI SDLC", "with intents and review gates", or "with the SDLC kit".
 metadata:
   version: 0.4.0
   source: https://github.com/evarnild/ai-sdlc-kit

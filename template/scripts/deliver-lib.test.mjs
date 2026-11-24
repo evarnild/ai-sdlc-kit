@@ -11,7 +11,7 @@ import {
   mergeMessage,
   planSteps,
   routeReasonStated,
-} from './ship-lib.mjs';
+} from './deliver-lib.mjs';
 
 const dir = 'intents/9-thing';
 const good = {

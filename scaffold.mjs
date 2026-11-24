@@ -130,7 +130,7 @@ if (opts.commit) {
       'commit', '-q', '-m',
       'Scaffold: AI-native SDLC kit\n\n' +
         'intents/ with templates and types, REVIEW-POLICY.md, sdlc.md, OVERVIEW.md,\n' +
-        'the /intent /spec /build-plan /review /ship /spawn /sessions /auto /grid\n' +
+        'the /intent /spec /build-plan /review /deliver /spawn /sessions /auto /grid\n' +
         'skills, implementer and reviewer agents, session hooks, check:intent, queue,\n' +
         'ship, spawn, sessions and sdlc:scan. Stack-agnostic until §1; the kit needs\n' +
         'only Node.',

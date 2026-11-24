@@ -136,7 +136,7 @@ It refuses to overwrite a folder that already exists.
 ### Then
 
 Open a **new Claude Code session in the project folder**. The project's
-skills (`/intent`, `/spec`, `/build-plan`, `/review`, `/konmari`, `/ship`,
+skills (`/intent`, `/spec`, `/build-plan`, `/review`, `/konmari`, `/deliver`,
 `/auto`, and the rest) and agents only load there. Then
 start §1 (see [section 15](#15-your-first-intent-1)).
 
@@ -157,7 +157,7 @@ docs/architecture.md the architecture principles, Enforced or Judged; §1 fills 
 docs/sdlc-grid.md    where the project stands on the L0–L4 grid
 scripts/             check-intent, blockers, size budget, queue, ship, spawn, sessions, sdlc-scan, and their tests (Node only)
 scripts/size-baseline.json  the line ceiling of every source file over 500 lines (empty at first)
-.claude/skills/      /intent /spec /build-plan /review /konmari /ship /spawn /sessions /auto /grid
+.claude/skills/      /intent /spec /build-plan /review /konmari /deliver /spawn /sessions /auto /grid
 .claude/agents/      <name>-implementer, <name>-reviewer, <name>-konmari
 .claude/settings.json  hooks that log what each session is doing (for /sessions)
 .codex/agents/       the same agents for Codex
@@ -341,7 +341,7 @@ date. See [section 10](#10-live-checks).
 ### Step 7: Merge
 
 Commit `review.md` (and the `live_checked:` date) to the branch. Then run
-`/ship 4` (or `/ship 4 --dry-run` to only ask "can it ship?"). Before
+`/deliver 4` (or `/deliver 4 --dry-run` to only ask "can it ship?"). Before
 merging, it checks three things and refuses if any fails:
 - the review covers exactly what is being merged (plus the KonMari commits
   `konmari.md` lists);
@@ -700,8 +700,8 @@ of what was just written.
 - **The record.** `intents/<id>-<slug>/konmari.md` holds `outcome: kept`,
   `discarded` or `nothing to tidy`, the tidy-up commits under
   `## Tidied` (and their reverts under `## Reverted`), what was looked at
-  and left, and proposed refactors. `/ship --dry-run` reports the outcome.
-- **Not a review round.** `reviewed-commit` stays where it was; `/ship`
+  and left, and proposed refactors. `/deliver --dry-run` reports the outcome.
+- **Not a review round.** `reviewed-commit` stays where it was; `/deliver`
   accepts the commits `konmari.md` lists after it, and no others.
 
 ---
@@ -728,7 +728,7 @@ The report's `## Live check` section then gives you:
 ```
 
 Do the steps. If it works, set `live_checked: <date>` (or tell Claude you
-ran it and ask it to record the date, or say "live checked" in your `/ship`
+ran it and ask it to record the date, or say "live checked" in your `/deliver`
 message) and commit it to the branch. If it doesn't, leave the date empty and send the change back to
 rework, or open a fix intent if the defect is out of scope.
 
@@ -770,13 +770,13 @@ Then it:
 4. pushes, if the repository has a remote;
 5. removes the intent's worktree and deletes its branch.
 
-`/ship <id>` does all of this as tested code (`npm run ship`), stopping at
-the first step that fails; re-running it resumes there. `/ship <id>
+`/deliver <id>` does all of this as tested code (`npm run deliver`), stopping at
+the first step that fails; re-running it resumes there. `/deliver <id>
 --dry-run` changes nothing and reports what would happen. If you ran the
-live check, say so in the same message ("live checked, /ship 4"), and it
+live check, say so in the same message ("live checked, /deliver 4"), and it
 records the date with your words. A worktree folder something still holds
 open is reported as "left for you": close it, then run
-`npm run ship -- <id> --cleanup`.
+`npm run deliver -- <id> --cleanup`.
 
 **Commit `review.md` and any `live_checked:` date to the branch first.** The
 merge check reads the branch from git, so it can't see uncommitted files.
@@ -823,12 +823,12 @@ more mostly adds rebases.
 
 `/auto <id>`, typed in the coordinator for an accepted intent, runs the
 steps without a prompt between them: spec, plan, spawn, implement, review,
-rework, for at most three review rounds. It ends at **"ready: `/ship
+rework, for at most three review rounds. It ends at **"ready: `/deliver
 <id>`"** and never ships.
 
 - **What your message authorises:** recording that intent's
   `plan_approved` (as `by-agent`, with a comment naming your message), and
-  nothing else. `spec_accepted`, `live_checked` and `/ship` stay yours.
+  nothing else. `spec_accepted`, `live_checked` and `/deliver` stay yours.
 - **A feature stops once at the spec** for your `spec_accepted`; a yes
   continues the run.
 - **The coordinator re-checks the review.** It re-runs `verify`,
@@ -974,7 +974,7 @@ claude  verdict: escalate · tier: reviewed (src/prompts/** is Reviewed).
         supplier.
 
 you   (run it, see a German reply, read the diff)
-you   > live checked: the reply was German and named the supplier. /ship 4
+you   > live checked: the reply was German and named the supplier. /deliver 4
 
 claude  live_checked recorded with your words. Checks pass: review
         committed at the reviewed commit, check:intent PASS. Merged
@@ -993,10 +993,10 @@ claude  live_checked recorded with your words. Checks pass: review
 | `/build-plan <id>` | draft the plan |
 | `/review [branch]` | run the review policy and write `review.md` |
 | `/konmari <id>` | tidy a reviewed change; reverted if any check fails |
-| `/ship <id> [--dry-run]` | merge a reviewed intent, bookkeep, push, clean up |
+| `/deliver <id> [--dry-run]` | merge a reviewed intent, bookkeep, push, clean up |
 | `/spawn <id> [--remove]` | a worktree and a session for one intent |
 | `/sessions` | what every session is doing, and what needs you |
-| `/auto <id>` | spec → plan → build → review on its own, up to "ready: /ship" |
+| `/auto <id>` | spec → plan → build → review on its own, up to "ready: /deliver" |
 | `/grid` | refresh `docs/sdlc-grid.md` |
 | `npm run verify` | the one check before a change is done |
 | `npm run queue [-- --next-id]` | every intent by status, generated from `metadata.yml` |
@@ -1009,7 +1009,7 @@ Phrases the coordinator understands as explicit requests:
 - "accept §N's intent", "accept the spec for §N", "approve the plan for §N"
 - "implement §N"
 - "review §N", or `/review`
-- "/ship N" (add "live checked" when you ran the check)
+- "/deliver N" (add "live checked" when you ran the check)
 - "/auto N"
 
 ---
@@ -1041,7 +1041,7 @@ The change grew a big file. Move the new code somewhere it belongs, or add
 `budget: <path> +<n>: <reason>` under the plan's "Where this goes" and raise
 the ceiling in `scripts/size-baseline.json` by at most 50.
 
-**`/ship` refuses: "changed since the reviewed commit besides …".**
+**`/deliver` refuses: "changed since the reviewed commit besides …".**
 A commit arrived after the review that isn't the review, the metadata or a
 KonMari commit listed in `konmari.md`. Run a new review round.
 
@@ -1061,7 +1061,7 @@ about deciding, not about length.
 **Can an agent merge or push for me automatically?**
 No. Each merge, push, branch deletion or worktree removal needs your
 explicit request, in the current conversation, for that change. `/auto`
-stops at "ready: `/ship <id>`"; the ship is always your message.
+stops at "ready: `/deliver <id>`"; the ship is always your message.
 
 **Where did `plan.md` go?**
 Earlier versions of the kit had a hand-kept root `plan.md` holding the
